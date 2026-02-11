@@ -15,8 +15,10 @@ abstract class ReviewDialogAdapter {
   /// Shows the satisfaction pre-dialog and returns the user's choice.
   ///
   /// Return [PreDialogResult.positive] to proceed to the OS review,
-  /// [PreDialogResult.negative] to show the feedback dialog, or
-  /// [PreDialogResult.dismissed] if the user closed without choosing.
+  /// [PreDialogResult.negative] to show the feedback dialog,
+  /// [PreDialogResult.remindLater] to skip this time without recording
+  /// a prompt, or [PreDialogResult.dismissed] if the user closed
+  /// without choosing.
   Future<PreDialogResult> showPreDialog(BuildContext context);
 
   /// Shows a feedback form after the user indicated dissatisfaction.

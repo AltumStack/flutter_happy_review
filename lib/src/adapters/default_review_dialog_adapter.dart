@@ -11,11 +11,16 @@ class DefaultPreDialogConfig {
   final String negativeLabel;
   final bool dismissible;
 
+  /// Label for the "remind me later" button. Set to `null` to hide
+  /// the button entirely.
+  final String? remindLaterLabel;
+
   const DefaultPreDialogConfig({
     this.title = 'Are you enjoying the app?',
     this.positiveLabel = 'Yes!',
     this.negativeLabel = 'Not really',
     this.dismissible = true,
+    this.remindLaterLabel = 'Later',
   });
 }
 
@@ -100,6 +105,12 @@ class _PreDialog extends StatelessWidget {
               Navigator.of(context).pop(PreDialogResult.negative),
           child: Text(config.negativeLabel),
         ),
+        if (config.remindLaterLabel != null)
+          TextButton(
+            onPressed: () =>
+                Navigator.of(context).pop(PreDialogResult.remindLater),
+            child: Text(config.remindLaterLabel!),
+          ),
         FilledButton(
           onPressed: () =>
               Navigator.of(context).pop(PreDialogResult.positive),
