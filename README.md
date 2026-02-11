@@ -6,8 +6,8 @@
 
 <p align="center">
   <a href="https://pub.dev/packages/happy_review"><img src="https://img.shields.io/pub/v/happy_review.svg" alt="Pub Version"></a>
-  <a href="https://github.com/AltumStack/flutter_happy_review/actions/workflows/ci.yml"><img src="https://github.com/AltumStack/flutter_happy_review/actions/workflows/ci.yml/badge.svg" alt="Build Status"></a>
-  <a href="https://codecov.io/gh/AltumStack/flutter_happy_review"><img src="https://codecov.io/gh/AltumStack/flutter_happy_review/branch/main/graph/badge.svg" alt="Codecov"></a>
+  <a href="https://github.com/AltumStack/flutter_happy_review/actions/workflows/code-coverage.yml"><img src="https://github.com/AltumStack/flutter_happy_review/actions/workflows/ci.yml/badge.svg" alt="Build Status"></a>
+  <a href="https://codecov.io/gh/AltumStack/flutter_happy_review"><img src="https://codecov.io/gh/AltumStack/flutter_happy_review/branch/master/graph/badge.svg" alt="Codecov"></a>
   <a href="https://pub.dev/packages/happy_review"><img src="https://img.shields.io/pub/popularity/happy_review" alt="Popularity"></a>
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License"></a>
   <a href="https://github.com/sponsors/AltumStack"><img src="https://img.shields.io/github/sponsors/AltumStack" alt="GitHub Sponsors"></a>
