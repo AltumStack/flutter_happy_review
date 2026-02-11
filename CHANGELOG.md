@@ -1,3 +1,14 @@
-## 0.0.1
+## 0.1.0
 
-* TODO: Describe initial release.
+* Initial release.
+* Event-driven triggers with configurable minimum occurrences.
+* Prerequisites (AND logic) to ensure baseline engagement before triggers fire.
+* Per-platform policy rules aligned with Apple and Google restrictions.
+* Emotional filter pre-dialog with positive, negative, remind later, and dismiss outcomes.
+* Feedback collection dialog for unsatisfied users.
+* Adapter pattern for fully customizable dialog UI and storage backend.
+* Built-in conditions: MinDaysAfterInstall, CooldownPeriod, MaxPromptsShown, CustomCondition.
+* Debug mode to bypass policies and conditions during development.
+* Kill switch to enable/disable the library at runtime.
+* Query methods for event counts, prompts shown, and last prompt date.
+* Callbacks for every step of the review flow.
