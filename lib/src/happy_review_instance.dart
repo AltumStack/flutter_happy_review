@@ -52,6 +52,15 @@ class HappyReview {
   bool _configured = false;
   bool _enabled = true;
   bool _debugMode = false;
+  InAppReview _inAppReview = InAppReview.instance;
+
+  /// Overrides the [InAppReview] instance used internally.
+  ///
+  /// This is exposed only for testing purposes.
+  @visibleForTesting
+  // ignore: use_setters_to_change_properties
+  void setInAppReviewInstance(InAppReview instance) =>
+      _inAppReview = instance;
 
   // -- Callbacks --
 
@@ -301,13 +310,11 @@ class HappyReview {
   }
 
   Future<void> _requestReview() async {
-    if (_debugMode) {
-      _log('DEBUG MODE: Skipping actual OS review request.');
-      return;
-    }
-    final inAppReview = InAppReview.instance;
-    if (await inAppReview.isAvailable()) {
-      await inAppReview.requestReview();
+    if (await _inAppReview.isAvailable()) {
+      _log('Requesting OS review.');
+      await _inAppReview.requestReview();
+    } else {
+      _log('OS review not available on this device.');
     }
   }
 

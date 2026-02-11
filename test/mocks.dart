@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
 import 'package:happy_review/happy_review.dart';
+import 'package:in_app_review/in_app_review.dart';
 import 'package:mocktail/mocktail.dart';
 
 class MockStorageAdapter extends Mock implements ReviewStorageAdapter {}
@@ -7,6 +8,8 @@ class MockStorageAdapter extends Mock implements ReviewStorageAdapter {}
 class MockDialogAdapter extends Mock implements ReviewDialogAdapter {}
 
 class MockBuildContext extends Mock implements BuildContext {}
+
+class MockInAppReview extends Mock implements InAppReview {}
 
 /// An in-memory [ReviewStorageAdapter] for testing.
 ///

@@ -8,6 +8,7 @@ import 'mocks.dart';
 void main() {
   late FakeStorageAdapter storage;
   late MockDialogAdapter dialogAdapter;
+  late MockInAppReview mockInAppReview;
 
   // Relaxed platform policy so it never blocks in tests.
   const relaxedPolicy = PlatformPolicy(
@@ -30,6 +31,15 @@ void main() {
   setUp(() {
     storage = FakeStorageAdapter();
     dialogAdapter = MockDialogAdapter();
+    mockInAppReview = MockInAppReview();
+
+    // Default: InAppReview is available and requestReview succeeds.
+    when(() => mockInAppReview.isAvailable())
+        .thenAnswer((_) async => true);
+    when(() => mockInAppReview.requestReview())
+        .thenAnswer((_) async {});
+
+    HappyReview.instance.setInAppReviewInstance(mockInAppReview);
   });
 
   /// Helper to configure HappyReview with common defaults for testing.
