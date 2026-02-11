@@ -45,6 +45,7 @@ import 'package:happy_review/happy_review.dart';
 
 // 1. Configure once at app startup.
 await HappyReview.instance.configure(
+  storageAdapter: MyStorageAdapter(), // You provide the implementation.
   triggers: [
     HappyTrigger(eventName: 'purchase_completed', minOccurrences: 3),
   ],
@@ -208,11 +209,9 @@ Omit `dialogAdapter` to skip the pre-dialog and request the OS review directly w
 
 ### Storage Adapter
 
-Controls where event counts and internal state are persisted.
+Controls where event counts and internal state are persisted. This is a **required** parameter — the library has zero opinion on your storage layer.
 
-**Default:** `SharedPreferencesStorageAdapter` (no extra dependencies).
-
-**Custom:** Implement `ReviewStorageAdapter`:
+Implement `ReviewStorageAdapter` with your preferred backend:
 
 ```dart
 class HiveStorageAdapter extends ReviewStorageAdapter {
@@ -230,11 +229,7 @@ class HiveStorageAdapter extends ReviewStorageAdapter {
 }
 ```
 
-Then pass it:
-
-```dart
-storageAdapter: HiveStorageAdapter(Hive.box('reviews'))
-```
+The [example app](example/) includes a `SharedPreferencesStorageAdapter` you can use as reference or copy directly into your project.
 
 ## Debug Mode
 
@@ -242,6 +237,7 @@ Enable debug mode during development to test the full dialog flow without OS res
 
 ```dart
 await HappyReview.instance.configure(
+  storageAdapter: myStorageAdapter,
   debugMode: true, // Skips platform policy, conditions, and OS review call.
   // ...
 );
@@ -260,6 +256,7 @@ Disable the library at runtime without redeploying (e.g., via remote config):
 ```dart
 // At configure time:
 await HappyReview.instance.configure(
+  storageAdapter: myStorageAdapter,
   enabled: false, // All logEvent calls return ReviewFlowResult.disabled.
   // ...
 );

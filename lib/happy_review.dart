@@ -18,7 +18,6 @@ export 'src/models/review_flow_result.dart';
 export 'src/adapters/review_dialog_adapter.dart';
 export 'src/adapters/default_review_dialog_adapter.dart';
 export 'src/adapters/review_storage_adapter.dart';
-export 'src/adapters/shared_preferences_storage_adapter.dart';
 
 // Conditions
 export 'src/conditions/review_condition.dart';

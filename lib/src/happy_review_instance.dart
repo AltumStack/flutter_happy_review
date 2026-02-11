@@ -3,7 +3,6 @@ import 'package:in_app_review/in_app_review.dart';
 
 import 'adapters/review_dialog_adapter.dart';
 import 'adapters/review_storage_adapter.dart';
-import 'adapters/shared_preferences_storage_adapter.dart';
 import 'conditions/cooldown_period.dart';
 import 'conditions/min_days_after_install.dart';
 import 'conditions/max_prompts_shown.dart';
@@ -75,8 +74,8 @@ class HappyReview {
   /// - [platformPolicy]: Per-platform frequency rules (optional, has defaults).
   /// - [dialogAdapter]: Controls the pre-dialog and feedback UI (optional).
   ///   If `null`, the OS review is requested directly when triggers fire.
-  /// - [storageAdapter]: Where to persist state (optional, defaults to
-  ///   SharedPreferences).
+  /// - [storageAdapter]: Where to persist state. You must provide an
+  ///   implementation of [ReviewStorageAdapter].
   /// - [enabled]: Whether the library is active. Set to `false` to disable
   ///   all review flows (e.g., via remote config). Defaults to `true`.
   /// - [debugMode]: When `true`, skips platform policy and conditions checks
@@ -87,7 +86,7 @@ class HappyReview {
     List<ReviewCondition> conditions = const [],
     PlatformPolicy platformPolicy = const PlatformPolicy(),
     ReviewDialogAdapter? dialogAdapter,
-    ReviewStorageAdapter? storageAdapter,
+    required ReviewStorageAdapter storageAdapter,
     bool enabled = true,
     bool debugMode = false,
     VoidCallback? onPreDialogShown,
@@ -103,7 +102,7 @@ class HappyReview {
     _conditions = conditions;
     _platformPolicy = platformPolicy;
     _dialogAdapter = dialogAdapter;
-    _storageAdapter = storageAdapter ?? SharedPreferencesStorageAdapter();
+    _storageAdapter = storageAdapter;
     _enabled = enabled;
     _debugMode = debugMode;
     _onPreDialogShown = onPreDialogShown;

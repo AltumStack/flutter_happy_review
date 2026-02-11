@@ -1,8 +1,7 @@
+import 'package:happy_review/happy_review.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'review_storage_adapter.dart';
-
-/// Default [ReviewStorageAdapter] backed by SharedPreferences.
+/// Example [ReviewStorageAdapter] backed by SharedPreferences.
 ///
 /// All keys are prefixed with `happy_review_` to avoid collisions.
 class SharedPreferencesStorageAdapter extends ReviewStorageAdapter {
