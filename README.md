@@ -1,29 +1,5 @@
-<h1 align="center">Happy Review</h1>
-
-<p align="center">
-  A strategic in-app review library for Flutter that triggers review prompts at <strong>proven moments of user satisfaction</strong>, not arbitrary launch counts.
-</p>
-
-<p align="center">
-  <a href="https://pub.dev/packages/happy_review"><img src="https://img.shields.io/pub/v/happy_review.svg" alt="Pub Version"></a>
-  <a href="https://github.com/AltumStack/flutter_happy_review/actions/workflows/code-coverage.yml"><img src="https://github.com/AltumStack/flutter_happy_review/actions/workflows/ci.yml/badge.svg" alt="Build Status"></a>
-  <a href="https://codecov.io/gh/AltumStack/flutter_happy_review"><img src="https://codecov.io/gh/AltumStack/flutter_happy_review/branch/master/graph/badge.svg" alt="Codecov"></a>
-  <a href="https://pub.dev/packages/happy_review"><img src="https://img.shields.io/pub/popularity/happy_review" alt="Popularity"></a>
-  <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License"></a>
-  <a href="https://github.com/sponsors/AltumStack"><img src="https://img.shields.io/github/sponsors/AltumStack" alt="GitHub Sponsors"></a>
-</p>
-
-<p align="center">
-  <a href="#the-problem">The Problem</a> &bull;
-  <a href="#the-solution">The Solution</a> &bull;
-  <a href="#use-cases">Use Cases</a> &bull;
-  <a href="#installation">Installation</a> &bull;
-  <a href="#quick-start">Quick Start</a> &bull;
-  <a href="#configuration">Configuration</a> &bull;
-  <a href="#adapters">Adapters</a>
-</p>
-
----
+# Happy Review
+[![codecov](https://codecov.io/gh/AltumStack/flutter_happy_review/graph/badge.svg?token=P5G36QKKTP)](https://codecov.io/gh/AltumStack/flutter_happy_review)
 
 ## The Problem
 
