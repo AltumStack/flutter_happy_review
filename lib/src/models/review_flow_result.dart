@@ -1,7 +1,14 @@
 /// Outcome of calling [HappyReview.logEvent].
 enum ReviewFlowResult {
+  /// The library is disabled via [HappyReview.setEnabled] or the
+  /// `enabled` parameter in [HappyReview.configure].
+  disabled,
+
   /// No trigger matched for this event.
   noTrigger,
+
+  /// A trigger matched but one or more prerequisites were not met.
+  prerequisitesNotMet,
 
   /// A trigger matched but platform policy prevented showing.
   blockedByPlatformPolicy,
@@ -16,6 +23,9 @@ enum ReviewFlowResult {
   /// The pre-dialog was shown and the user responded negatively.
   /// The feedback dialog was displayed.
   feedbackSubmitted,
+
+  /// The pre-dialog was shown and the user chose "remind me later".
+  remindLater,
 
   /// The pre-dialog was shown and the user dismissed it.
   dialogDismissed,

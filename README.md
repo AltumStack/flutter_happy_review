@@ -16,18 +16,19 @@ Most apps request reviews based on how many times the app was opened. This is a 
 Happy Review replaces the launch counter with an **event-driven** approach:
 
 1. **Triggers** fire when the user completes a happy-path action (purchase, workout, delivery).
-2. **Platform Policy** enforces per-platform frequency rules aligned with Apple/Google restrictions.
-3. **Conditions** add business-level guards (days since install, cooldowns, custom logic).
-4. **Emotional Filter** shows a pre-dialog ("Are you enjoying the app?") that routes satisfied users to the OS review and captures feedback from unsatisfied users — privately.
+2. **Prerequisites** ensure baseline engagement before any trigger can activate (AND logic).
+3. **Platform Policy** enforces per-platform frequency rules aligned with Apple/Google restrictions.
+4. **Conditions** add business-level guards (days since install, cooldowns, custom logic).
+5. **Emotional Filter** shows a pre-dialog ("Are you enjoying the app?") that routes satisfied users to the OS review and captures feedback from unsatisfied users — privately.
 
 ```text
-logEvent() -> Trigger met? -> Platform policy OK? -> Conditions pass?
-                                                          |
-                                                    Pre-dialog shown
-                                                     /           \
-                                                Positive      Negative
-                                                   |              |
-                                            OS In-App Review   Feedback form
+logEvent() -> Trigger met? -> Prerequisites OK? -> Platform policy OK? -> Conditions pass?
+                                                                              |
+                                                                       Pre-dialog shown
+                                                                      /       |        \
+                                                                Positive   Later    Negative
+                                                                   |         |          |
+                                                            OS Review    Skip      Feedback form
 ```
 
 ## Installation
@@ -60,15 +61,29 @@ That's it. After 3 purchases, the pre-dialog appears. If the user responds posit
 
 ### Triggers
 
-Define which events can activate the review flow:
+Define which events can activate the review flow (OR logic — any single trigger is enough):
 
 ```dart
 triggers: [
   HappyTrigger(eventName: 'purchase_completed', minOccurrences: 3),
-  HappyTrigger(eventName: 'onboarding_finished', minOccurrences: 1),
   HappyTrigger(eventName: 'streak_reached', minOccurrences: 1),
 ]
 ```
+
+### Prerequisites
+
+Events that must ALL have occurred before any trigger can fire (AND logic):
+
+```dart
+prerequisites: [
+  // User must finish onboarding before any review flow can start.
+  HappyTrigger(eventName: 'onboarding_finished', minOccurrences: 1),
+  // User must have used the app at least 5 times.
+  HappyTrigger(eventName: 'app_session', minOccurrences: 5),
+]
+```
+
+This is useful for ensuring baseline engagement. Triggers are OR ("any of these can activate"), prerequisites are AND ("all of these must be true first").
 
 ### Conditions
 
@@ -128,6 +143,7 @@ React to every step of the review flow:
 onPreDialogShown: () => analytics.log('pre_dialog_shown'),
 onPreDialogPositive: () => analytics.log('user_happy'),
 onPreDialogNegative: () => analytics.log('user_unhappy'),
+onPreDialogRemindLater: () => analytics.log('user_remind_later'),
 onPreDialogDismissed: () => analytics.log('dialog_dismissed'),
 onReviewRequested: () => analytics.log('os_review_requested'),
 onFeedbackSubmitted: (feedback) => sendToBackend(feedback),
@@ -149,6 +165,7 @@ dialogAdapter: DefaultReviewDialogAdapter(
     title: 'Enjoying our app?',
     positiveLabel: 'Love it!',
     negativeLabel: 'Not really',
+    remindLaterLabel: 'Maybe later', // Set to null to hide this button.
   ),
   feedbackConfig: DefaultFeedbackDialogConfig(
     title: 'What could we improve?',
@@ -219,23 +236,73 @@ Then pass it:
 storageAdapter: HiveStorageAdapter(Hive.box('reviews'))
 ```
 
+## Debug Mode
+
+Enable debug mode during development to test the full dialog flow without OS restrictions:
+
+```dart
+await HappyReview.instance.configure(
+  debugMode: true, // Skips platform policy, conditions, and OS review call.
+  // ...
+);
+```
+
+In debug mode:
+- Platform policy checks are bypassed.
+- All conditions are skipped.
+- The OS `requestReview()` call is skipped (the dialog flow still runs).
+- Detailed logs are printed via `debugPrint`.
+
+## Kill Switch
+
+Disable the library at runtime without redeploying (e.g., via remote config):
+
+```dart
+// At configure time:
+await HappyReview.instance.configure(
+  enabled: false, // All logEvent calls return ReviewFlowResult.disabled.
+  // ...
+);
+
+// Or toggle at runtime:
+HappyReview.instance.setEnabled(remoteConfig.getBool('enable_review_prompt'));
+```
+
+## Query State
+
+Inspect internal state without triggering the review flow:
+
+```dart
+// How many times has this event been logged?
+final count = await HappyReview.instance.getEventCount('purchase_completed');
+
+// How many times has the review prompt been shown?
+final prompts = await HappyReview.instance.getPromptsShownCount();
+
+// When was the last prompt shown?
+final lastDate = await HappyReview.instance.getLastPromptDate();
+```
+
 ## Return Values
 
 `logEvent` returns a `ReviewFlowResult` so you know exactly what happened:
 
 | Result | Meaning |
 | --- | --- |
+| `disabled` | Library is disabled via kill switch |
 | `noTrigger` | No trigger matched for this event |
+| `prerequisitesNotMet` | One or more prerequisites are not satisfied |
 | `blockedByPlatformPolicy` | Platform frequency limit reached |
 | `conditionsNotMet` | A condition returned false |
 | `reviewRequested` | User was happy; OS review requested |
 | `reviewRequestedDirect` | No dialog adapter; OS review requested directly |
 | `feedbackSubmitted` | User was unhappy; feedback collected |
+| `remindLater` | User chose to be reminded later |
 | `dialogDismissed` | User dismissed without choosing |
 
 ## Full Example
 
-See the [example app](example/) for a complete working demo that simulates an e-commerce happy flow.
+See the [example app](example/) for a complete working demo that simulates an e-commerce happy flow with prerequisites, debug mode, and kill switch.
 
 ## License
 

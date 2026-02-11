@@ -45,51 +45,71 @@ class HappyReview {
   // -- Configuration --
 
   List<HappyTrigger> _triggers = [];
+  List<HappyTrigger> _prerequisites = [];
   List<ReviewCondition> _conditions = [];
   PlatformPolicy _platformPolicy = const PlatformPolicy();
   ReviewDialogAdapter? _dialogAdapter;
   late ReviewStorageAdapter _storageAdapter;
   bool _configured = false;
+  bool _enabled = true;
+  bool _debugMode = false;
 
   // -- Callbacks --
 
   VoidCallback? _onPreDialogShown;
   VoidCallback? _onPreDialogPositive;
   VoidCallback? _onPreDialogNegative;
+  VoidCallback? _onPreDialogRemindLater;
   VoidCallback? _onPreDialogDismissed;
   VoidCallback? _onReviewRequested;
   FeedbackCallback? _onFeedbackSubmitted;
 
   /// Configures the library. Call this once during app initialization.
   ///
-  /// - [triggers]: Events that can activate the review flow.
+  /// - [triggers]: Events that can activate the review flow (OR logic —
+  ///   any single trigger is enough).
+  /// - [prerequisites]: Events that must ALL have occurred before any
+  ///   trigger can activate (AND logic). Useful for requiring baseline
+  ///   engagement (e.g., onboarding completed).
   /// - [conditions]: Additional rules that must pass (optional).
   /// - [platformPolicy]: Per-platform frequency rules (optional, has defaults).
   /// - [dialogAdapter]: Controls the pre-dialog and feedback UI (optional).
   ///   If `null`, the OS review is requested directly when triggers fire.
   /// - [storageAdapter]: Where to persist state (optional, defaults to
   ///   SharedPreferences).
+  /// - [enabled]: Whether the library is active. Set to `false` to disable
+  ///   all review flows (e.g., via remote config). Defaults to `true`.
+  /// - [debugMode]: When `true`, skips platform policy and conditions checks
+  ///   so you can test the full dialog flow during development.
   Future<void> configure({
     required List<HappyTrigger> triggers,
+    List<HappyTrigger> prerequisites = const [],
     List<ReviewCondition> conditions = const [],
     PlatformPolicy platformPolicy = const PlatformPolicy(),
     ReviewDialogAdapter? dialogAdapter,
     ReviewStorageAdapter? storageAdapter,
+    bool enabled = true,
+    bool debugMode = false,
     VoidCallback? onPreDialogShown,
     VoidCallback? onPreDialogPositive,
     VoidCallback? onPreDialogNegative,
+    VoidCallback? onPreDialogRemindLater,
     VoidCallback? onPreDialogDismissed,
     VoidCallback? onReviewRequested,
     FeedbackCallback? onFeedbackSubmitted,
   }) async {
     _triggers = triggers;
+    _prerequisites = prerequisites;
     _conditions = conditions;
     _platformPolicy = platformPolicy;
     _dialogAdapter = dialogAdapter;
     _storageAdapter = storageAdapter ?? SharedPreferencesStorageAdapter();
+    _enabled = enabled;
+    _debugMode = debugMode;
     _onPreDialogShown = onPreDialogShown;
     _onPreDialogPositive = onPreDialogPositive;
     _onPreDialogNegative = onPreDialogNegative;
+    _onPreDialogRemindLater = onPreDialogRemindLater;
     _onPreDialogDismissed = onPreDialogDismissed;
     _onReviewRequested = onReviewRequested;
     _onFeedbackSubmitted = onFeedbackSubmitted;
@@ -97,7 +117,26 @@ class HappyReview {
 
     // Record install date on first configure.
     await MinDaysAfterInstall.recordInstallIfNeeded(_storageAdapter);
+
+    if (_debugMode) {
+      debugPrint('[HappyReview] Configured in DEBUG mode.');
+    }
   }
+
+  /// Enables or disables the library at runtime.
+  ///
+  /// When disabled, [logEvent] returns [ReviewFlowResult.disabled]
+  /// immediately. Useful as a remote kill switch.
+  void setEnabled(bool enabled) {
+    assert(_configured, 'Call HappyReview.instance.configure() first.');
+    _enabled = enabled;
+    if (_debugMode) {
+      debugPrint('[HappyReview] Enabled: $_enabled');
+    }
+  }
+
+  /// Whether the library is currently enabled.
+  bool get isEnabled => _enabled;
 
   /// Records an event and evaluates whether to start the review flow.
   ///
@@ -111,45 +150,98 @@ class HappyReview {
   ) async {
     assert(_configured, 'Call HappyReview.instance.configure() first.');
 
+    if (!_enabled) {
+      _log('Disabled — ignoring event "$eventName".');
+      return ReviewFlowResult.disabled;
+    }
+
     // 1. Increment event count.
     final countKey = 'event_count_$eventName';
     final currentCount = await _storageAdapter.getInt(countKey);
     final newCount = currentCount + 1;
     await _storageAdapter.setInt(countKey, newCount);
 
+    _log('Event "$eventName" logged ($newCount total).');
+
     // 2. Check if any trigger for this event is met.
     final matchingTrigger = _triggers
         .where((t) => t.eventName == eventName && newCount >= t.minOccurrences)
         .firstOrNull;
 
-    if (matchingTrigger == null) return ReviewFlowResult.noTrigger;
+    if (matchingTrigger == null) {
+      _log('No trigger matched for "$eventName".');
+      return ReviewFlowResult.noTrigger;
+    }
 
-    // 3. Check platform policy.
+    _log('Trigger matched: ${matchingTrigger.eventName} '
+        '(needs ${matchingTrigger.minOccurrences}, has $newCount).');
+
+    // 3. Check prerequisites (AND — all must be met).
+    if (!_debugMode) {
+      for (final prereq in _prerequisites) {
+        final prereqCount =
+            await _storageAdapter.getInt('event_count_${prereq.eventName}');
+        if (prereqCount < prereq.minOccurrences) {
+          _log('Prerequisite not met: "${prereq.eventName}" '
+              '(needs ${prereq.minOccurrences}, has $prereqCount).');
+          return ReviewFlowResult.prerequisitesNotMet;
+        }
+      }
+    }
+
+    // 4. Check platform policy.
     final policyChecker = PlatformPolicyChecker(
       rules: _platformPolicy.current,
       storage: _storageAdapter,
     );
-    if (!await policyChecker.canShow()) {
+    if (!_debugMode && !await policyChecker.canShow()) {
+      _log('Blocked by platform policy.');
       return ReviewFlowResult.blockedByPlatformPolicy;
     }
 
-    // 4. Check custom conditions.
-    for (final condition in _conditions) {
-      if (!await condition.evaluate(_storageAdapter)) {
-        return ReviewFlowResult.conditionsNotMet;
+    // 5. Check custom conditions.
+    if (!_debugMode) {
+      for (final condition in _conditions) {
+        if (!await condition.evaluate(_storageAdapter)) {
+          _log('Condition not met: ${condition.runtimeType}.');
+          return ReviewFlowResult.conditionsNotMet;
+        }
       }
     }
 
-    // 5. Run the review flow.
+    // 6. Run the review flow.
     if (!context.mounted) return ReviewFlowResult.dialogDismissed;
     return _executeFlow(context, policyChecker);
+  }
+
+  // -- Query methods --
+
+  /// Returns the current count for a given event.
+  Future<int> getEventCount(String eventName) async {
+    assert(_configured, 'Call HappyReview.instance.configure() first.');
+    return _storageAdapter.getInt('event_count_$eventName');
+  }
+
+  /// Returns the total number of times the review flow has been shown.
+  Future<int> getPromptsShownCount() async {
+    assert(_configured, 'Call HappyReview.instance.configure() first.');
+    return _storageAdapter.getInt('prompts_shown_count');
+  }
+
+  /// Returns the date of the last review prompt, or `null` if never shown.
+  Future<DateTime?> getLastPromptDate() async {
+    assert(_configured, 'Call HappyReview.instance.configure() first.');
+    return _storageAdapter.getDateTime('last_prompt_date');
   }
 
   /// Resets all persisted state. Useful for testing or debugging.
   Future<void> reset() async {
     assert(_configured, 'Call HappyReview.instance.configure() first.');
     await _storageAdapter.clear();
+    _log('All state reset.');
   }
+
+  // -- Private --
 
   Future<ReviewFlowResult> _executeFlow(
     BuildContext context,
@@ -164,11 +256,13 @@ class HappyReview {
     if (_dialogAdapter == null) {
       await _requestReview();
       _onReviewRequested?.call();
+      _log('OS review requested directly (no dialog adapter).');
       return ReviewFlowResult.reviewRequestedDirect;
     }
 
     // Show pre-dialog.
     _onPreDialogShown?.call();
+    _log('Showing pre-dialog.');
 
     if (!context.mounted) return ReviewFlowResult.dialogDismissed;
 
@@ -179,29 +273,48 @@ class HappyReview {
         _onPreDialogPositive?.call();
         await _requestReview();
         _onReviewRequested?.call();
+        _log('User positive → OS review requested.');
         return ReviewFlowResult.reviewRequested;
 
       case PreDialogResult.negative:
         _onPreDialogNegative?.call();
+        _log('User negative → showing feedback dialog.');
         if (!context.mounted) return ReviewFlowResult.dialogDismissed;
         final feedback =
             await _dialogAdapter!.showFeedbackDialog(context);
         if (feedback != null) {
           _onFeedbackSubmitted?.call(feedback);
+          _log('Feedback submitted: $feedback');
           return ReviewFlowResult.feedbackSubmitted;
         }
         return ReviewFlowResult.dialogDismissed;
 
+      case PreDialogResult.remindLater:
+        _onPreDialogRemindLater?.call();
+        _log('User chose remind later.');
+        return ReviewFlowResult.remindLater;
+
       case PreDialogResult.dismissed:
         _onPreDialogDismissed?.call();
+        _log('User dismissed pre-dialog.');
         return ReviewFlowResult.dialogDismissed;
     }
   }
 
   Future<void> _requestReview() async {
+    if (_debugMode) {
+      _log('DEBUG MODE: Skipping actual OS review request.');
+      return;
+    }
     final inAppReview = InAppReview.instance;
     if (await inAppReview.isAvailable()) {
       await inAppReview.requestReview();
+    }
+  }
+
+  void _log(String message) {
+    if (_debugMode) {
+      debugPrint('[HappyReview] $message');
     }
   }
 }

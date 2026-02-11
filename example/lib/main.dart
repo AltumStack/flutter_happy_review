@@ -8,7 +8,9 @@ void main() async {
     triggers: [
       // Trigger after 3 successful purchases.
       const HappyTrigger(eventName: 'purchase_completed', minOccurrences: 3),
-      // Trigger after completing onboarding.
+    ],
+    prerequisites: [
+      // User must have completed onboarding before any trigger fires.
       const HappyTrigger(eventName: 'onboarding_finished', minOccurrences: 1),
     ],
     conditions: [
@@ -32,6 +34,7 @@ void main() async {
         title: 'Enjoying Happy Shop?',
         positiveLabel: 'Love it!',
         negativeLabel: 'Not really',
+        remindLaterLabel: 'Maybe later',
       ),
       feedbackConfig: const DefaultFeedbackDialogConfig(
         title: 'What could we improve?',
@@ -41,9 +44,11 @@ void main() async {
         thankYouMessage: 'Thanks! Your feedback helps us improve.',
       ),
     ),
+    debugMode: true,
     onPreDialogShown: () => debugPrint('[HappyReview] Pre-dialog shown'),
     onPreDialogPositive: () => debugPrint('[HappyReview] User is happy!'),
     onPreDialogNegative: () => debugPrint('[HappyReview] User is not happy'),
+    onPreDialogRemindLater: () => debugPrint('[HappyReview] Remind later'),
     onPreDialogDismissed: () => debugPrint('[HappyReview] Dialog dismissed'),
     onReviewRequested: () => debugPrint('[HappyReview] OS review requested'),
     onFeedbackSubmitted: (feedback) =>
@@ -78,13 +83,24 @@ class ShopPage extends StatefulWidget {
 }
 
 class _ShopPageState extends State<ShopPage> {
-  int _purchaseCount = 0;
   String _lastResult = 'No events logged yet.';
+  bool _onboarded = false;
+  int _purchaseCount = 0;
+
+  Future<void> _completeOnboarding() async {
+    final result = await HappyReview.instance.logEvent(
+      context,
+      'onboarding_finished',
+    );
+    setState(() {
+      _onboarded = true;
+      _lastResult = 'Onboarding → $result';
+    });
+  }
 
   Future<void> _simulatePurchase() async {
     setState(() => _purchaseCount++);
 
-    // Log the happy event — the library handles the rest.
     final result = await HappyReview.instance.logEvent(
       context,
       'purchase_completed',
@@ -95,20 +111,40 @@ class _ShopPageState extends State<ShopPage> {
     }
   }
 
+  void _toggleEnabled() {
+    final newValue = !HappyReview.instance.isEnabled;
+    HappyReview.instance.setEnabled(newValue);
+    setState(() {
+      _lastResult = 'Library ${newValue ? 'enabled' : 'disabled'} (kill switch)';
+    });
+  }
+
   Future<void> _resetState() async {
     await HappyReview.instance.reset();
     setState(() {
       _purchaseCount = 0;
+      _onboarded = false;
       _lastResult = 'State reset. Start over!';
     });
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Happy Shop'),
         actions: [
+          IconButton(
+            icon: Icon(
+              HappyReview.instance.isEnabled
+                  ? Icons.toggle_on
+                  : Icons.toggle_off,
+            ),
+            tooltip: 'Toggle kill switch',
+            onPressed: _toggleEnabled,
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'Reset state',
@@ -129,43 +165,54 @@ class _ShopPageState extends State<ShopPage> {
                     const Icon(Icons.shopping_bag, size: 64),
                     const SizedBox(height: 16),
                     Text(
-                      'Purchases completed: $_purchaseCount',
-                      style: Theme.of(context).textTheme.headlineSmall,
+                      'Purchases: $_purchaseCount',
+                      style: theme.textTheme.headlineSmall,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Onboarded: ${_onboarded ? "Yes" : "No"}',
+                      style: theme.textTheme.bodyLarge,
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'The review flow triggers after 3 purchases.',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Theme.of(context).colorScheme.outline,
-                          ),
+                      'Prerequisite: onboarding. Trigger: 3 purchases.',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.outline,
+                      ),
                     ),
                   ],
                 ),
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 16),
+            FilledButton.tonal(
+              onPressed: _onboarded ? null : _completeOnboarding,
+              child: Text(
+                _onboarded
+                    ? 'Onboarding completed'
+                    : 'Complete Onboarding (prerequisite)',
+              ),
+            ),
+            const SizedBox(height: 8),
             FilledButton.icon(
               onPressed: _simulatePurchase,
               icon: const Icon(Icons.check_circle),
               label: const Text('Complete a Purchase'),
             ),
             const SizedBox(height: 32),
-            Text(
-              'Last result:',
-              style: Theme.of(context).textTheme.labelLarge,
-            ),
+            Text('Last result:', style: theme.textTheme.labelLarge),
             const SizedBox(height: 4),
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                color: theme.colorScheme.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
                 _lastResult,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      fontFamily: 'monospace',
-                    ),
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontFamily: 'monospace',
+                ),
               ),
             ),
           ],
