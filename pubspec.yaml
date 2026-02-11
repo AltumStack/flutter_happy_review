@@ -1,7 +1,6 @@
 name: happy_review
 description: "A strategic in-app review library for Flutter that triggers review prompts at happy moments, not arbitrary launch counts."
 version: 0.1.0
-publisher: altumstack.com
 homepage: https://github.com/AltumStack/flutter_happy_review
 repository: https://github.com/AltumStack/flutter_happy_review
 issue_tracker: https://github.com/AltumStack/flutter_happy_review/issues
