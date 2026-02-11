@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:happy_review/happy_review.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'shared_preferences_storage_adapter.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  final prefs = await SharedPreferences.getInstance();
+
   await HappyReview.instance.configure(
-    storageAdapter: SharedPreferencesStorageAdapter(),
+    storageAdapter: SharedPreferencesStorageAdapter(prefs),
     triggers: [
       // Trigger after 3 successful purchases.
       const HappyTrigger(eventName: 'purchase_completed', minOccurrences: 3),
