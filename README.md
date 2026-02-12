@@ -1,4 +1,5 @@
 # Happy Review
+[![Pub Version](https://img.shields.io/pub/v/flutter_secure_storage.svg)](https://pub.dev/packages/happy_review)
 [![codecov](https://codecov.io/gh/AltumStack/flutter_happy_review/graph/badge.svg?token=P5G36QKKTP)](https://codecov.io/gh/AltumStack/flutter_happy_review)
 
 ## The Problem
