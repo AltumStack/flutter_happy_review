@@ -525,6 +525,34 @@ final lastDate = await HappyReview.instance.getLastPromptDate();
 | `remindLater`             | User chose to be reminded later                 |
 | `dialogDismissed`         | User dismissed without choosing                 |
 
+## Testing
+
+Import `happy_review/testing.dart` to get fakes for your tests — no mocking library needed:
+
+```dart
+import 'package:happy_review/happy_review.dart';
+import 'package:happy_review/testing.dart';
+
+// In-memory storage that works like a real backend.
+final storage = FakeStorageAdapter();
+
+// Dialog adapter that returns predetermined results.
+// Defaults to PreDialogResult.positive.
+final adapter = FakeDialogAdapter();
+
+// Simulate an unhappy user with feedback:
+final unhappyAdapter = FakeDialogAdapter(
+  preDialogResult: PreDialogResult.negative,
+  feedbackResult: FeedbackResult(comment: 'Too slow'),
+);
+
+await HappyReview.instance.configure(
+  storageAdapter: storage,
+  triggers: [const HappyTrigger(eventName: 'purchase', minOccurrences: 1)],
+  dialogAdapter: adapter,
+);
+```
+
 ## Full Example
 
 See the [example app](example/) for a complete working demo that simulates an e-commerce happy flow

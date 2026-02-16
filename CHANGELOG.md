@@ -4,6 +4,7 @@
 * **Breaking:** Debug mode no longer bypasses prerequisites, platform policy, or conditions. It now only enables detailed logging via `debugPrint`. Use a relaxed `PlatformPolicy` to test the dialog flow during development.
 * **Fix:** `reset()` now re-records the install date after clearing storage, so `MinDaysAfterInstall` continues to work correctly after a reset.
 * **Fix:** `PlatformPolicy` now includes a `macOS` field with iOS defaults. Previously macOS silently fell back to Android rules.
+* **New:** `happy_review/testing.dart` exports `FakeStorageAdapter` and `FakeDialogAdapter` so consumers can test their integration without a mocking library.
 
 ## 0.1.0
 
@@ -15,7 +16,7 @@
 * Feedback collection dialog for unsatisfied users.
 * Adapter pattern for fully customizable dialog UI and storage backend.
 * Built-in conditions: MinDaysAfterInstall, CooldownPeriod, MaxPromptsShown, CustomCondition.
-* Debug mode to bypass policies and conditions during development.
+* Debug mode for detailed logging during development.
 * Kill switch to enable/disable the library at runtime.
 * Query methods for event counts, prompts shown, and last prompt date.
 * Callbacks for every step of the review flow.
