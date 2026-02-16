@@ -9,7 +9,7 @@
 > Read the full strategy behind this library: [The Art of Asking: In-App Review Strategy for Mobile Applications](https://medium.com/@amarturelo/the-art-of-asking-in-app-review-strategy-for-mobile-applications-67d4ccb9fce6)
 
 <p align="center">
-  <img src="docs/img.png" alt="Happy Review example app" width="300"/>
+  <img src="doc/img.png" alt="Happy Review example app" width="300"/>
 </p>
 
 ## The Problem
