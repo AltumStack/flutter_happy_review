@@ -34,6 +34,11 @@ void main() async {
         maxPrompts: 99,
         maxPromptsPeriod: Duration(days: 365),
       ),
+      macOS: PlatformRules(
+        cooldown: Duration(seconds: 10),
+        maxPrompts: 99,
+        maxPromptsPeriod: Duration(days: 365),
+      ),
     ),
     dialogAdapter: DefaultReviewDialogAdapter(
       preDialogConfig: const DefaultPreDialogConfig(
@@ -89,9 +94,16 @@ class ShopPage extends StatefulWidget {
 }
 
 class _ShopPageState extends State<ShopPage> {
+  final _debugPanelKey = GlobalKey<State>();
   String _lastResult = 'No events logged yet.';
   bool _onboarded = false;
   int _purchaseCount = 0;
+
+  /// Forces the debug panel to rebuild and refresh its snapshot.
+  void _refreshDebugPanel() {
+    // Trigger a rebuild so the panel re-fetches the snapshot.
+    setState(() {});
+  }
 
   Future<void> _completeOnboarding() async {
     final result = await HappyReview.instance.logEvent(
@@ -102,6 +114,7 @@ class _ShopPageState extends State<ShopPage> {
       _onboarded = true;
       _lastResult = 'Onboarding → $result';
     });
+    _refreshDebugPanel();
   }
 
   Future<void> _simulatePurchase() async {
@@ -114,6 +127,7 @@ class _ShopPageState extends State<ShopPage> {
 
     if (mounted) {
       setState(() => _lastResult = 'Purchase #$_purchaseCount → $result');
+      _refreshDebugPanel();
     }
   }
 
@@ -123,6 +137,7 @@ class _ShopPageState extends State<ShopPage> {
     setState(() {
       _lastResult = 'Library ${newValue ? 'enabled' : 'disabled'} (kill switch)';
     });
+    _refreshDebugPanel();
   }
 
   Future<void> _resetState() async {
@@ -132,6 +147,7 @@ class _ShopPageState extends State<ShopPage> {
       _onboarded = false;
       _lastResult = 'State reset. Start over!';
     });
+    _refreshDebugPanel();
   }
 
   @override
@@ -158,7 +174,7 @@ class _ShopPageState extends State<ShopPage> {
           ),
         ],
       ),
-      body: Padding(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -221,6 +237,8 @@ class _ShopPageState extends State<ShopPage> {
                 ),
               ),
             ),
+            const SizedBox(height: 24),
+            HappyReviewDebugPanel(key: _debugPanelKey),
           ],
         ),
       ),

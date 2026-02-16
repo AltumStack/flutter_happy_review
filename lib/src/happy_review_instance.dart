@@ -4,9 +4,11 @@ import 'package:in_app_review/in_app_review.dart';
 import 'adapters/review_dialog_adapter.dart';
 import 'adapters/review_storage_adapter.dart';
 import 'conditions/cooldown_period.dart';
+import 'conditions/custom_condition.dart';
 import 'conditions/min_days_after_install.dart';
 import 'conditions/max_prompts_shown.dart';
 import 'conditions/review_condition.dart';
+import 'models/debug_snapshot.dart';
 import 'models/feedback_result.dart';
 import 'models/happy_trigger.dart';
 import 'models/platform_policy.dart';
@@ -87,8 +89,8 @@ class HappyReview {
   ///   implementation of [ReviewStorageAdapter].
   /// - [enabled]: Whether the library is active. Set to `false` to disable
   ///   all review flows (e.g., via remote config). Defaults to `true`.
-  /// - [debugMode]: When `true`, skips platform policy and conditions checks
-  ///   so you can test the full dialog flow during development.
+  /// - [debugMode]: When `true`, enables detailed logging via [debugPrint]
+  ///   so you can observe the full pipeline during development.
   Future<void> configure({
     required List<HappyTrigger> triggers,
     List<HappyTrigger> prerequisites = const [],
@@ -185,15 +187,13 @@ class HappyReview {
         '(needs ${matchingTrigger.minOccurrences}, has $newCount).');
 
     // 3. Check prerequisites (AND — all must be met).
-    if (!_debugMode) {
-      for (final prereq in _prerequisites) {
-        final prereqCount =
-            await _storageAdapter.getInt('event_count_${prereq.eventName}');
-        if (prereqCount < prereq.minOccurrences) {
-          _log('Prerequisite not met: "${prereq.eventName}" '
-              '(needs ${prereq.minOccurrences}, has $prereqCount).');
-          return ReviewFlowResult.prerequisitesNotMet;
-        }
+    for (final prereq in _prerequisites) {
+      final prereqCount =
+          await _storageAdapter.getInt('event_count_${prereq.eventName}');
+      if (prereqCount < prereq.minOccurrences) {
+        _log('Prerequisite not met: "${prereq.eventName}" '
+            '(needs ${prereq.minOccurrences}, has $prereqCount).');
+        return ReviewFlowResult.prerequisitesNotMet;
       }
     }
 
@@ -202,18 +202,16 @@ class HappyReview {
       rules: _platformPolicy.current,
       storage: _storageAdapter,
     );
-    if (!_debugMode && !await policyChecker.canShow()) {
+    if (!await policyChecker.canShow()) {
       _log('Blocked by platform policy.');
       return ReviewFlowResult.blockedByPlatformPolicy;
     }
 
     // 5. Check custom conditions.
-    if (!_debugMode) {
-      for (final condition in _conditions) {
-        if (!await condition.evaluate(_storageAdapter)) {
-          _log('Condition not met: ${condition.runtimeType}.');
-          return ReviewFlowResult.conditionsNotMet;
-        }
+    for (final condition in _conditions) {
+      if (!await condition.evaluate(_storageAdapter)) {
+        _log('Condition not met: ${condition.runtimeType}.');
+        return ReviewFlowResult.conditionsNotMet;
       }
     }
 
@@ -243,10 +241,68 @@ class HappyReview {
   }
 
   /// Resets all persisted state. Useful for testing or debugging.
+  ///
+  /// Re-records the install date so [MinDaysAfterInstall] continues
+  /// to work correctly after a reset.
   Future<void> reset() async {
     assert(_configured, 'Call HappyReview.instance.configure() first.');
     await _storageAdapter.clear();
+    await MinDaysAfterInstall.recordInstallIfNeeded(_storageAdapter);
     _log('All state reset.');
+  }
+
+  /// Returns a snapshot of the library's internal state for debugging.
+  ///
+  /// Resolves current counts, prerequisite status, platform policy,
+  /// and condition evaluations into a single [DebugSnapshot].
+  Future<DebugSnapshot> getDebugSnapshot() async {
+    assert(_configured, 'Call HappyReview.instance.configure() first.');
+
+    final triggerStatuses = <TriggerStatus>[];
+    for (final t in _triggers) {
+      final count = await _storageAdapter.getInt('event_count_${t.eventName}');
+      triggerStatuses.add(TriggerStatus(
+        eventName: t.eventName,
+        minOccurrences: t.minOccurrences,
+        currentCount: count,
+      ));
+    }
+
+    final prereqStatuses = <TriggerStatus>[];
+    for (final p in _prerequisites) {
+      final count = await _storageAdapter.getInt('event_count_${p.eventName}');
+      prereqStatuses.add(TriggerStatus(
+        eventName: p.eventName,
+        minOccurrences: p.minOccurrences,
+        currentCount: count,
+      ));
+    }
+
+    final policyChecker = PlatformPolicyChecker(
+      rules: _platformPolicy.current,
+      storage: _storageAdapter,
+    );
+    final policyAllows = await policyChecker.canShow();
+
+    final conditionStatuses = <ConditionStatus>[];
+    for (final c in _conditions) {
+      final met = await c.evaluate(_storageAdapter);
+      final name = c is CustomCondition ? c.name : c.runtimeType.toString();
+      conditionStatuses.add(ConditionStatus(name: name, isMet: met));
+    }
+
+    return DebugSnapshot(
+      enabled: _enabled,
+      debugMode: _debugMode,
+      hasDialogAdapter: _dialogAdapter != null,
+      triggers: triggerStatuses,
+      prerequisites: prereqStatuses,
+      platformPolicyAllows: policyAllows,
+      conditions: conditionStatuses,
+      promptsShown: await _storageAdapter.getInt('prompts_shown_count'),
+      lastPromptDate: await _storageAdapter.getDateTime('last_prompt_date'),
+      installDate: await _storageAdapter.getDateTime('install_date'),
+    );
   }
 
   // -- Private --
@@ -255,13 +311,9 @@ class HappyReview {
     BuildContext context,
     PlatformPolicyChecker policyChecker,
   ) async {
-    // Record that a prompt was shown.
-    await policyChecker.recordPrompt();
-    await CooldownPeriod.recordPrompt(_storageAdapter);
-    await MaxPromptsShown.incrementCount(_storageAdapter);
-
     // No dialog adapter → request review directly.
     if (_dialogAdapter == null) {
+      await _recordPromptShown(policyChecker);
       await _requestReview();
       _onReviewRequested?.call();
       _log('OS review requested directly (no dialog adapter).');
@@ -278,6 +330,7 @@ class HappyReview {
 
     switch (preResult) {
       case PreDialogResult.positive:
+        await _recordPromptShown(policyChecker);
         _onPreDialogPositive?.call();
         await _requestReview();
         _onReviewRequested?.call();
@@ -285,6 +338,7 @@ class HappyReview {
         return ReviewFlowResult.reviewRequested;
 
       case PreDialogResult.negative:
+        await _recordPromptShown(policyChecker);
         _onPreDialogNegative?.call();
         _log('User negative → showing feedback dialog.');
         if (!context.mounted) return ReviewFlowResult.dialogDismissed;
@@ -307,6 +361,12 @@ class HappyReview {
         _log('User dismissed pre-dialog.');
         return ReviewFlowResult.dialogDismissed;
     }
+  }
+
+  Future<void> _recordPromptShown(PlatformPolicyChecker policyChecker) async {
+    await policyChecker.recordPrompt();
+    await CooldownPeriod.recordPrompt(_storageAdapter);
+    await MaxPromptsShown.incrementCount(_storageAdapter);
   }
 
   Future<void> _requestReview() async {

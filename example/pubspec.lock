@@ -104,7 +104,7 @@ packages:
     source: path
     version: "0.1.0"
   in_app_review:
-    dependency: transitive
+    dependency: "direct dev"
     description:
       name: in_app_review
       sha256: ab26ac54dbd802896af78c670b265eaeab7ecddd6af4d0751e9604b60574817f
@@ -175,6 +175,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.16.0"
+  mocktail:
+    dependency: "direct dev"
+    description:
+      name: mocktail
+      sha256: "890df3f9688106f25755f26b1c60589a92b3ab91a22b8b224947ad041bf172d8"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.0.4"
   path:
     dependency: transitive
     description:
