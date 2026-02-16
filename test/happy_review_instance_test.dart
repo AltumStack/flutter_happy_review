@@ -281,7 +281,7 @@ void main() {
     testWidgets(
       'Given debug mode is on and prerequisite is not met, '
       'When logEvent triggers, '
-      'Then prerequisites are skipped',
+      'Then prerequisites are still enforced',
       (tester) async {
         // Given
         await configureWith(
@@ -303,8 +303,8 @@ void main() {
         final result = await HappyReview.instance
             .logEvent(context, 'purchase');
 
-        // Then — debug mode bypasses prerequisites
-        expect(result, equals(ReviewFlowResult.reviewRequestedDirect));
+        // Then — debug mode does NOT bypass prerequisites
+        expect(result, equals(ReviewFlowResult.prerequisitesNotMet));
       },
     );
   });
@@ -357,7 +357,7 @@ void main() {
     testWidgets(
       'Given debug mode is on and platform policy would block, '
       'When logEvent triggers, '
-      'Then platform policy is bypassed',
+      'Then platform policy is still enforced',
       (tester) async {
         // Given
         await configureWith(
@@ -391,8 +391,9 @@ void main() {
         final result = await HappyReview.instance
             .logEvent(context, 'purchase');
 
-        // Then
-        expect(result, equals(ReviewFlowResult.reviewRequestedDirect));
+        // Then — debug mode does NOT bypass platform policy
+        expect(
+            result, equals(ReviewFlowResult.blockedByPlatformPolicy));
       },
     );
   });
@@ -433,7 +434,7 @@ void main() {
     testWidgets(
       'Given debug mode is on and a condition would fail, '
       'When logEvent triggers, '
-      'Then conditions are bypassed',
+      'Then conditions are still enforced',
       (tester) async {
         // Given
         await configureWith(
@@ -457,8 +458,8 @@ void main() {
         final result = await HappyReview.instance
             .logEvent(context, 'purchase');
 
-        // Then
-        expect(result, equals(ReviewFlowResult.reviewRequestedDirect));
+        // Then — debug mode does NOT bypass conditions
+        expect(result, equals(ReviewFlowResult.conditionsNotMet));
       },
     );
   });
@@ -1162,4 +1163,43 @@ void main() {
       },
     );
   });
+
+  group('Reset', () {
+    testWidgets(
+      'Given MinDaysAfterInstall condition, '
+      'When reset is called and a new event is logged, '
+      'Then the flow still works because install date is re-recorded',
+      (tester) async {
+        // Given
+        when(() => dialogAdapter.showPreDialog(any()))
+            .thenAnswer((_) async => PreDialogResult.positive);
+
+        await configureWith(
+          triggers: [
+            const HappyTrigger(
+                eventName: 'purchase', minOccurrences: 1),
+          ],
+          conditions: [const MinDaysAfterInstall(days: 0)],
+          dialog: dialogAdapter,
+        );
+
+        await tester.pumpWidget(const MaterialApp(home: Scaffold()));
+        final context = tester.element(find.byType(Scaffold));
+
+        // First flow works.
+        final first =
+            await HappyReview.instance.logEvent(context, 'purchase');
+        expect(first, equals(ReviewFlowResult.reviewRequested));
+
+        // When — reset all state.
+        await HappyReview.instance.reset();
+
+        // Then — flow still works after reset.
+        final afterReset =
+            await HappyReview.instance.logEvent(context, 'purchase');
+        expect(afterReset, equals(ReviewFlowResult.reviewRequested));
+      },
+    );
+  });
+
 }
