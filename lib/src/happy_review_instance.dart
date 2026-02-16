@@ -239,9 +239,13 @@ class HappyReview {
   }
 
   /// Resets all persisted state. Useful for testing or debugging.
+  ///
+  /// Re-records the install date so [MinDaysAfterInstall] continues
+  /// to work correctly after a reset.
   Future<void> reset() async {
     assert(_configured, 'Call HappyReview.instance.configure() first.');
     await _storageAdapter.clear();
+    await MinDaysAfterInstall.recordInstallIfNeeded(_storageAdapter);
     _log('All state reset.');
   }
 

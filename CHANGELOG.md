@@ -2,6 +2,7 @@
 
 * **Fix:** "Remind later" and "dismissed" no longer count as a shown prompt. Previously, platform policy, cooldown, and max prompts counters were incremented before the dialog was shown — burning a prompt slot even when the user didn't engage. Now, counters are only updated on positive or negative responses.
 * **Breaking:** Debug mode no longer bypasses prerequisites, platform policy, or conditions. It now only enables detailed logging via `debugPrint`. Use a relaxed `PlatformPolicy` to test the dialog flow during development.
+* **Fix:** `reset()` now re-records the install date after clearing storage, so `MinDaysAfterInstall` continues to work correctly after a reset.
 
 ## 0.1.0
 
