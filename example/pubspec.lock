@@ -104,7 +104,7 @@ packages:
     source: path
     version: "0.1.0"
   in_app_review:
-    dependency: transitive
+    dependency: "direct dev"
     description:
       name: in_app_review
       sha256: ab26ac54dbd802896af78c670b265eaeab7ecddd6af4d0751e9604b60574817f

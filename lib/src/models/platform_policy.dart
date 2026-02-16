@@ -7,15 +7,18 @@ import 'dart:io' show Platform;
 class PlatformPolicy {
   final PlatformRules android;
   final PlatformRules ios;
+  final PlatformRules macOS;
 
   const PlatformPolicy({
     this.android = const PlatformRules.androidDefaults(),
     this.ios = const PlatformRules.iosDefaults(),
+    this.macOS = const PlatformRules.iosDefaults(),
   });
 
   /// Returns the rules for the current platform.
   PlatformRules get current {
     if (Platform.isIOS) return ios;
+    if (Platform.isMacOS) return macOS;
     return android;
   }
 }

@@ -94,6 +94,11 @@ void main() {
             maxPrompts: 99,
             maxPromptsPeriod: Duration(days: 365),
           ),
+          macOS: PlatformRules(
+            cooldown: Duration(seconds: 10),
+            maxPrompts: 99,
+            maxPromptsPeriod: Duration(days: 365),
+          ),
         ),
         dialogAdapter: dialogAdapter,
         debugMode: true,

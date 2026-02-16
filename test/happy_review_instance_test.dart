@@ -22,6 +22,11 @@ void main() {
       maxPrompts: 999,
       maxPromptsPeriod: Duration(days: 365),
     ),
+    macOS: PlatformRules(
+      cooldown: Duration.zero,
+      maxPrompts: 999,
+      maxPromptsPeriod: Duration(days: 365),
+    ),
   );
 
   setUpAll(() {
