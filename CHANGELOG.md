@@ -5,6 +5,7 @@
 * **Fix:** `reset()` now re-records the install date after clearing storage, so `MinDaysAfterInstall` continues to work correctly after a reset.
 * **Fix:** `PlatformPolicy` now includes a `macOS` field with iOS defaults. Previously macOS silently fell back to Android rules.
 * **New:** `happy_review/testing.dart` exports `FakeStorageAdapter` and `FakeDialogAdapter` so consumers can test their integration without a mocking library.
+* **New:** `HappyReviewDebugPanel` widget and `getDebugSnapshot()` method for inspecting internal state during development.
 
 ## 0.1.0
 
