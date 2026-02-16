@@ -995,4 +995,171 @@ void main() {
       },
     );
   });
+
+  group('Prompt recording', () {
+    testWidgets(
+      'Given user responds positively, '
+      'When the flow completes, '
+      'Then prompt counters are incremented',
+      (tester) async {
+        // Given
+        when(() => dialogAdapter.showPreDialog(any()))
+            .thenAnswer((_) async => PreDialogResult.positive);
+
+        await configureWith(
+          triggers: [
+            const HappyTrigger(
+                eventName: 'purchase', minOccurrences: 1),
+          ],
+          dialog: dialogAdapter,
+        );
+
+        await tester.pumpWidget(const MaterialApp(home: Scaffold()));
+        final context = tester.element(find.byType(Scaffold));
+
+        // When
+        await HappyReview.instance.logEvent(context, 'purchase');
+
+        // Then
+        final promptsShown =
+            await HappyReview.instance.getPromptsShownCount();
+        final lastDate =
+            await HappyReview.instance.getLastPromptDate();
+        expect(promptsShown, equals(1));
+        expect(lastDate, isNotNull);
+      },
+    );
+
+    testWidgets(
+      'Given user responds negatively, '
+      'When the flow completes, '
+      'Then prompt counters are incremented',
+      (tester) async {
+        // Given
+        when(() => dialogAdapter.showPreDialog(any()))
+            .thenAnswer((_) async => PreDialogResult.negative);
+        when(() => dialogAdapter.showFeedbackDialog(any()))
+            .thenAnswer((_) async =>
+                const FeedbackResult(comment: 'Bad'));
+
+        await configureWith(
+          triggers: [
+            const HappyTrigger(
+                eventName: 'purchase', minOccurrences: 1),
+          ],
+          dialog: dialogAdapter,
+        );
+
+        await tester.pumpWidget(const MaterialApp(home: Scaffold()));
+        final context = tester.element(find.byType(Scaffold));
+
+        // When
+        await HappyReview.instance.logEvent(context, 'purchase');
+
+        // Then
+        final promptsShown =
+            await HappyReview.instance.getPromptsShownCount();
+        final lastDate =
+            await HappyReview.instance.getLastPromptDate();
+        expect(promptsShown, equals(1));
+        expect(lastDate, isNotNull);
+      },
+    );
+
+    testWidgets(
+      'Given user chooses remind later, '
+      'When the flow completes, '
+      'Then prompt counters are NOT incremented',
+      (tester) async {
+        // Given
+        when(() => dialogAdapter.showPreDialog(any()))
+            .thenAnswer((_) async => PreDialogResult.remindLater);
+
+        await configureWith(
+          triggers: [
+            const HappyTrigger(
+                eventName: 'purchase', minOccurrences: 1),
+          ],
+          dialog: dialogAdapter,
+        );
+
+        await tester.pumpWidget(const MaterialApp(home: Scaffold()));
+        final context = tester.element(find.byType(Scaffold));
+
+        // When
+        await HappyReview.instance.logEvent(context, 'purchase');
+
+        // Then
+        final promptsShown =
+            await HappyReview.instance.getPromptsShownCount();
+        final lastDate =
+            await HappyReview.instance.getLastPromptDate();
+        expect(promptsShown, equals(0));
+        expect(lastDate, isNull);
+      },
+    );
+
+    testWidgets(
+      'Given user dismisses the pre-dialog, '
+      'When the flow completes, '
+      'Then prompt counters are NOT incremented',
+      (tester) async {
+        // Given
+        when(() => dialogAdapter.showPreDialog(any()))
+            .thenAnswer((_) async => PreDialogResult.dismissed);
+
+        await configureWith(
+          triggers: [
+            const HappyTrigger(
+                eventName: 'purchase', minOccurrences: 1),
+          ],
+          dialog: dialogAdapter,
+        );
+
+        await tester.pumpWidget(const MaterialApp(home: Scaffold()));
+        final context = tester.element(find.byType(Scaffold));
+
+        // When
+        await HappyReview.instance.logEvent(context, 'purchase');
+
+        // Then
+        final promptsShown =
+            await HappyReview.instance.getPromptsShownCount();
+        final lastDate =
+            await HappyReview.instance.getLastPromptDate();
+        expect(promptsShown, equals(0));
+        expect(lastDate, isNull);
+      },
+    );
+
+    testWidgets(
+      'Given no dialog adapter is configured, '
+      'When trigger activates, '
+      'Then prompt counters are incremented',
+      (tester) async {
+        // Given
+        await configureWith(
+          triggers: [
+            const HappyTrigger(
+                eventName: 'purchase', minOccurrences: 1),
+          ],
+          dialog: null,
+        );
+
+        await tester.pumpWidget(const MaterialApp(home: Scaffold()));
+        final context = tester.element(find.byType(Scaffold));
+
+        // When
+        await HappyReview.instance.logEvent(context, 'purchase');
+
+        // Then
+        final promptsShown =
+            await HappyReview.instance.getPromptsShownCount();
+        final lastDate =
+            await HappyReview.instance.getLastPromptDate();
+        expect(promptsShown, equals(1));
+        expect(lastDate, isNotNull);
+      },
+    );
+  });
 }
