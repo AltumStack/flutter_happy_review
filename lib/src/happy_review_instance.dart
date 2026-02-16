@@ -255,13 +255,9 @@ class HappyReview {
     BuildContext context,
     PlatformPolicyChecker policyChecker,
   ) async {
-    // Record that a prompt was shown.
-    await policyChecker.recordPrompt();
-    await CooldownPeriod.recordPrompt(_storageAdapter);
-    await MaxPromptsShown.incrementCount(_storageAdapter);
-
     // No dialog adapter → request review directly.
     if (_dialogAdapter == null) {
+      await _recordPromptShown(policyChecker);
       await _requestReview();
       _onReviewRequested?.call();
       _log('OS review requested directly (no dialog adapter).');
@@ -278,6 +274,7 @@ class HappyReview {
 
     switch (preResult) {
       case PreDialogResult.positive:
+        await _recordPromptShown(policyChecker);
         _onPreDialogPositive?.call();
         await _requestReview();
         _onReviewRequested?.call();
@@ -285,6 +282,7 @@ class HappyReview {
         return ReviewFlowResult.reviewRequested;
 
       case PreDialogResult.negative:
+        await _recordPromptShown(policyChecker);
         _onPreDialogNegative?.call();
         _log('User negative → showing feedback dialog.');
         if (!context.mounted) return ReviewFlowResult.dialogDismissed;
@@ -307,6 +305,12 @@ class HappyReview {
         _log('User dismissed pre-dialog.');
         return ReviewFlowResult.dialogDismissed;
     }
+  }
+
+  Future<void> _recordPromptShown(PlatformPolicyChecker policyChecker) async {
+    await policyChecker.recordPrompt();
+    await CooldownPeriod.recordPrompt(_storageAdapter);
+    await MaxPromptsShown.incrementCount(_storageAdapter);
   }
 
   Future<void> _requestReview() async {
