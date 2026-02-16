@@ -1,3 +1,5 @@
+import 'dart:io' show Platform;
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:happy_review/happy_review.dart';
 import 'package:happy_review/src/platform_policy_checker.dart';
@@ -194,6 +196,61 @@ void main() {
 
         // Then
         expect(result, isTrue);
+      },
+    );
+  });
+
+  group('PlatformPolicy', () {
+    test(
+      'Given default PlatformPolicy, '
+      'When accessing macOS rules, '
+      'Then returns iOS defaults (Apple platform)',
+      () {
+        const policy = PlatformPolicy();
+        final macRules = policy.macOS;
+        final iosRules = policy.ios;
+
+        expect(macRules.cooldown, equals(iosRules.cooldown));
+        expect(macRules.maxPrompts, equals(iosRules.maxPrompts));
+        expect(macRules.maxPromptsPeriod, equals(iosRules.maxPromptsPeriod));
+      },
+    );
+
+    test(
+      'Given custom macOS rules, '
+      'When creating PlatformPolicy, '
+      'Then macOS uses the custom rules',
+      () {
+        const customRules = PlatformRules(
+          cooldown: Duration(days: 30),
+          maxPrompts: 5,
+          maxPromptsPeriod: Duration(days: 180),
+        );
+        const policy = PlatformPolicy(macOS: customRules);
+
+        expect(policy.macOS.cooldown, equals(const Duration(days: 30)));
+        expect(policy.macOS.maxPrompts, equals(5));
+        expect(
+            policy.macOS.maxPromptsPeriod, equals(const Duration(days: 180)));
+      },
+    );
+
+    test(
+      'Given running on macOS, '
+      'When accessing current, '
+      'Then returns macOS rules',
+      () {
+        const macRules = PlatformRules(
+          cooldown: Duration(days: 45),
+          maxPrompts: 7,
+          maxPromptsPeriod: Duration(days: 200),
+        );
+        const policy = PlatformPolicy(macOS: macRules);
+
+        if (Platform.isMacOS) {
+          expect(policy.current.cooldown, equals(const Duration(days: 45)));
+          expect(policy.current.maxPrompts, equals(7));
+        }
       },
     );
   });
