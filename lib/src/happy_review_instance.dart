@@ -87,8 +87,8 @@ class HappyReview {
   ///   implementation of [ReviewStorageAdapter].
   /// - [enabled]: Whether the library is active. Set to `false` to disable
   ///   all review flows (e.g., via remote config). Defaults to `true`.
-  /// - [debugMode]: When `true`, skips platform policy and conditions checks
-  ///   so you can test the full dialog flow during development.
+  /// - [debugMode]: When `true`, enables detailed logging via [debugPrint]
+  ///   so you can observe the full pipeline during development.
   Future<void> configure({
     required List<HappyTrigger> triggers,
     List<HappyTrigger> prerequisites = const [],
@@ -185,15 +185,13 @@ class HappyReview {
         '(needs ${matchingTrigger.minOccurrences}, has $newCount).');
 
     // 3. Check prerequisites (AND — all must be met).
-    if (!_debugMode) {
-      for (final prereq in _prerequisites) {
-        final prereqCount =
-            await _storageAdapter.getInt('event_count_${prereq.eventName}');
-        if (prereqCount < prereq.minOccurrences) {
-          _log('Prerequisite not met: "${prereq.eventName}" '
-              '(needs ${prereq.minOccurrences}, has $prereqCount).');
-          return ReviewFlowResult.prerequisitesNotMet;
-        }
+    for (final prereq in _prerequisites) {
+      final prereqCount =
+          await _storageAdapter.getInt('event_count_${prereq.eventName}');
+      if (prereqCount < prereq.minOccurrences) {
+        _log('Prerequisite not met: "${prereq.eventName}" '
+            '(needs ${prereq.minOccurrences}, has $prereqCount).');
+        return ReviewFlowResult.prerequisitesNotMet;
       }
     }
 
@@ -202,18 +200,16 @@ class HappyReview {
       rules: _platformPolicy.current,
       storage: _storageAdapter,
     );
-    if (!_debugMode && !await policyChecker.canShow()) {
+    if (!await policyChecker.canShow()) {
       _log('Blocked by platform policy.');
       return ReviewFlowResult.blockedByPlatformPolicy;
     }
 
     // 5. Check custom conditions.
-    if (!_debugMode) {
-      for (final condition in _conditions) {
-        if (!await condition.evaluate(_storageAdapter)) {
-          _log('Condition not met: ${condition.runtimeType}.');
-          return ReviewFlowResult.conditionsNotMet;
-        }
+    for (final condition in _conditions) {
+      if (!await condition.evaluate(_storageAdapter)) {
+        _log('Condition not met: ${condition.runtimeType}.');
+        return ReviewFlowResult.conditionsNotMet;
       }
     }
 

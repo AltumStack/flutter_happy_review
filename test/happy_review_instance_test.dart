@@ -281,7 +281,7 @@ void main() {
     testWidgets(
       'Given debug mode is on and prerequisite is not met, '
       'When logEvent triggers, '
-      'Then prerequisites are skipped',
+      'Then prerequisites are still enforced',
       (tester) async {
         // Given
         await configureWith(
@@ -303,8 +303,8 @@ void main() {
         final result = await HappyReview.instance
             .logEvent(context, 'purchase');
 
-        // Then — debug mode bypasses prerequisites
-        expect(result, equals(ReviewFlowResult.reviewRequestedDirect));
+        // Then — debug mode does NOT bypass prerequisites
+        expect(result, equals(ReviewFlowResult.prerequisitesNotMet));
       },
     );
   });
@@ -357,7 +357,7 @@ void main() {
     testWidgets(
       'Given debug mode is on and platform policy would block, '
       'When logEvent triggers, '
-      'Then platform policy is bypassed',
+      'Then platform policy is still enforced',
       (tester) async {
         // Given
         await configureWith(
@@ -391,8 +391,9 @@ void main() {
         final result = await HappyReview.instance
             .logEvent(context, 'purchase');
 
-        // Then
-        expect(result, equals(ReviewFlowResult.reviewRequestedDirect));
+        // Then — debug mode does NOT bypass platform policy
+        expect(
+            result, equals(ReviewFlowResult.blockedByPlatformPolicy));
       },
     );
   });
@@ -433,7 +434,7 @@ void main() {
     testWidgets(
       'Given debug mode is on and a condition would fail, '
       'When logEvent triggers, '
-      'Then conditions are bypassed',
+      'Then conditions are still enforced',
       (tester) async {
         // Given
         await configureWith(
@@ -457,8 +458,8 @@ void main() {
         final result = await HappyReview.instance
             .logEvent(context, 'purchase');
 
-        // Then
-        expect(result, equals(ReviewFlowResult.reviewRequestedDirect));
+        // Then — debug mode does NOT bypass conditions
+        expect(result, equals(ReviewFlowResult.conditionsNotMet));
       },
     );
   });
@@ -1162,4 +1163,5 @@ void main() {
       },
     );
   });
+
 }

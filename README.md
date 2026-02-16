@@ -435,22 +435,37 @@ copy directly into your project.
 
 ## Debug Mode
 
-Enable debug mode during development to test the full dialog flow without OS restrictions:
+Enable debug mode during development to observe the full pipeline via logs:
 
 ```dart
 await HappyReview.instance.configure(
   storageAdapter: myStorageAdapter,
-  debugMode: true, // Bypasses platform policy and conditions.
+  debugMode: true, // Enables detailed logging.
   // ...
 );
 ```
 
 In debug mode:
 
-- Platform policy checks are bypassed.
-- All conditions are skipped.
-- Prerequisites are bypassed.
-- Detailed logs are printed via `debugPrint`.
+- Detailed logs are printed via `debugPrint` at every pipeline stage.
+- All checks (prerequisites, platform policy, conditions) are still enforced.
+
+To test the dialog flow during development, use a relaxed platform policy instead:
+
+```dart
+platformPolicy: const PlatformPolicy(
+  android: PlatformRules(
+    cooldown: Duration(seconds: 10),
+    maxPrompts: 99,
+    maxPromptsPeriod: Duration(days: 365),
+  ),
+  ios: PlatformRules(
+    cooldown: Duration(seconds: 10),
+    maxPrompts: 99,
+    maxPromptsPeriod: Duration(days: 365),
+  ),
+),
+```
 
 ## Kill Switch
 
