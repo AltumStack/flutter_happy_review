@@ -8,6 +8,7 @@ library;
 export 'src/happy_review_instance.dart';
 
 // Models
+export 'src/models/debug_snapshot.dart';
 export 'src/models/feedback_result.dart';
 export 'src/models/happy_trigger.dart';
 export 'src/models/platform_policy.dart';
@@ -18,6 +19,9 @@ export 'src/models/review_flow_result.dart';
 export 'src/adapters/review_dialog_adapter.dart';
 export 'src/adapters/default_review_dialog_adapter.dart';
 export 'src/adapters/review_storage_adapter.dart';
+
+// Widgets
+export 'src/widgets/happy_review_debug_panel.dart';
 
 // Conditions
 export 'src/conditions/review_condition.dart';

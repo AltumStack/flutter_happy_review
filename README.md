@@ -1,6 +1,16 @@
 # Happy Review
+
 [![Pub Version](https://img.shields.io/pub/v/happy_review.svg)](https://pub.dev/packages/happy_review)
 [![codecov](https://codecov.io/gh/AltumStack/flutter_happy_review/graph/badge.svg?token=P5G36QKKTP)](https://codecov.io/gh/AltumStack/flutter_happy_review)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+
+**Event-driven in-app review prompts for Flutter.** Trigger reviews at moments of user satisfaction — not arbitrary launch counts.
+
+> Read the full strategy behind this library: [The Art of Asking: In-App Review Strategy for Mobile Applications](https://medium.com/@amarturelo/the-art-of-asking-in-app-review-strategy-for-mobile-applications-67d4ccb9fce6)
+
+<p align="center">
+  <img src="docs/img.png" alt="Happy Review example app" width="300"/>
+</p>
 
 ## The Problem
 
@@ -32,203 +42,11 @@ logEvent() -> Trigger met? -> Prerequisites OK? -> Platform policy OK? -> Condit
                                                             OS Review    Skip      Feedback form
 ```
 
-## Use Cases
-
-Happy Review is flexible enough to support any review-prompting strategy — from sophisticated
-event-driven flows to the simplest launch-count approach.
-
-### E-Commerce — Review after successful purchases
-
-Ask for a review after the user has completed multiple purchases, ensuring they've experienced your
-core value proposition.
-
-```dart
-await HappyReview.instance.configure(
-  storageAdapter: myStorage,
-  triggers: [
-    const HappyTrigger(eventName: 'purchase_completed', minOccurrences: 3),
-  ],
-  prerequisites: [
-    const HappyTrigger(eventName: 'onboarding_finished', minOccurrences: 1),
-  ],
-  dialogAdapter: DefaultReviewDialogAdapter(),
-);
-
-// After a successful purchase:
-await HappyReview.instance.logEvent(context, 'purchase_completed');
-```
-
-### Fitness / Health — Review after achieving a streak
-
-Trigger the review when the user has proven consistency and is most engaged.
-
-```dart
-await HappyReview.instance.configure(
-  storageAdapter: myStorage,
-  triggers: [
-    const HappyTrigger(eventName: 'workout_completed', minOccurrences: 10),
-    const HappyTrigger(eventName: 'streak_7_days', minOccurrences: 1),
-  ],
-  conditions: [
-    const MinDaysAfterInstall(days: 14),
-    const CooldownPeriod(days: 90),
-  ],
-  dialogAdapter: DefaultReviewDialogAdapter(
-    preDialogConfig: const DefaultPreDialogConfig(
-      title: 'Crushing your goals!',
-      positiveLabel: 'Rate us!',
-      negativeLabel: 'Could be better',
-    ),
-  ),
-);
-```
-
-### Delivery / Logistics — Review after a successful delivery
-
-The user just received their order — peak satisfaction.
-
-```dart
-await HappyReview.instance.configure(
-  storageAdapter: myStorage,
-  triggers: [
-    const HappyTrigger(eventName: 'delivery_confirmed', minOccurrences: 2),
-  ],
-  conditions: [
-    const MinDaysAfterInstall(days: 7),
-    const MaxPromptsShown(maxPrompts: 3),
-    CustomCondition(
-      name: 'no_recent_complaint',
-      evaluate: () async => !(await supportRepo.hasOpenTicket()),
-    ),
-  ],
-  dialogAdapter: DefaultReviewDialogAdapter(),
-);
-```
-
-### SaaS / Productivity — Review after completing a key workflow
-
-Ask after the user has created content, exported a report, or hit a milestone.
-
-```dart
-await HappyReview.instance.configure(
-  storageAdapter: myStorage,
-  triggers: [
-    const HappyTrigger(eventName: 'report_exported', minOccurrences: 5),
-    const HappyTrigger(eventName: 'project_completed', minOccurrences: 1),
-  ],
-  prerequisites: [
-    const HappyTrigger(eventName: 'profile_setup', minOccurrences: 1),
-  ],
-  dialogAdapter: DefaultReviewDialogAdapter(
-    preDialogConfig: const DefaultPreDialogConfig(
-      title: 'How is your experience?',
-      positiveLabel: 'Great!',
-      negativeLabel: 'Not great',
-      remindLaterLabel: 'Ask me later',
-    ),
-  ),
-);
-```
-
-### Gaming — Review after winning or reaching a level
-
-Capture the dopamine hit right when the player is most excited.
-
-```dart
-await HappyReview.instance.configure(
-  storageAdapter: myStorage,
-  triggers: [
-    const HappyTrigger(eventName: 'level_completed', minOccurrences: 10),
-    const HappyTrigger(eventName: 'boss_defeated', minOccurrences: 1),
-  ],
-  conditions: [
-    const MinDaysAfterInstall(days: 3),
-    const CooldownPeriod(days: 60),
-  ],
-  dialogAdapter: DefaultReviewDialogAdapter(),
-);
-```
-
-### Education — Review after completing a course module
-
-The student just passed a test or finished a chapter — sense of accomplishment.
-
-```dart
-await HappyReview.instance.configure(
-  storageAdapter: myStorage,
-  triggers: [
-    const HappyTrigger(eventName: 'module_completed', minOccurrences: 3),
-    const HappyTrigger(eventName: 'certificate_earned', minOccurrences: 1),
-  ],
-  dialogAdapter: DefaultReviewDialogAdapter(
-    preDialogConfig: const DefaultPreDialogConfig(
-      title: 'Congrats on your progress!',
-      positiveLabel: 'Love learning here!',
-      negativeLabel: 'Needs improvement',
-    ),
-  ),
-);
-```
-
-### Direct OS review — No emotional filter
-
-Skip the pre-dialog entirely and request the OS review directly when triggers fire. Useful when
-you've already validated satisfaction through other means.
-
-```dart
-await HappyReview.instance.configure(
-  storageAdapter: myStorage,
-  triggers: [
-    const HappyTrigger(eventName: 'nps_score_9_or_10', minOccurrences: 1),
-  ],
-  // No dialogAdapter → OS review is requested directly.
-);
-```
-
-### Simple launch count (advanced_in_app_review style)
-
-If you still prefer the launch-count approach (e.g., ask after 5 app opens), Happy Review supports
-it — though we recommend event-driven triggers for better results.
-
-```dart
-await HappyReview.instance.configure(
-  storageAdapter: myStorage,
-  triggers: [
-    const HappyTrigger(eventName: 'app_opened', minOccurrences: 5),
-  ],
-  // No dialogAdapter, no conditions — just launch count + OS review.
-);
-
-// Call on every app start:
-await HappyReview.instance.logEvent(context, 'app_opened');
-```
-
-### Remote kill switch with Firebase Remote Config
-
-Disable review prompts instantly without deploying a new version.
-
-```dart
-final remoteConfig = FirebaseRemoteConfig.instance;
-await remoteConfig.fetchAndActivate();
-
-await HappyReview.instance.configure(
-  storageAdapter: myStorage,
-  enabled: remoteConfig.getBool('enable_review_prompt'),
-  triggers: [
-    const HappyTrigger(eventName: 'purchase_completed', minOccurrences: 3),
-  ],
-  dialogAdapter: DefaultReviewDialogAdapter(),
-);
-
-// Or toggle at runtime:
-HappyReview.instance.setEnabled(remoteConfig.getBool('enable_review_prompt'));
-```
-
 ## Installation
 
 ```yaml
 dependencies:
-  happy_review: ^0.1.0
+  happy_review: ^0.2.0
 ```
 
 ## Platform Support
@@ -438,6 +256,54 @@ class HiveStorageAdapter extends ReviewStorageAdapter {
 The [example app](example/) includes a `SharedPreferencesStorageAdapter` you can use as reference or
 copy directly into your project.
 
+## Return Values
+
+`logEvent` returns a `ReviewFlowResult` so you know exactly what happened:
+
+| Result                    | Meaning                                         |
+|---------------------------|-------------------------------------------------|
+| `disabled`                | Library is disabled via kill switch             |
+| `noTrigger`               | No trigger matched for this event               |
+| `prerequisitesNotMet`     | One or more prerequisites are not satisfied     |
+| `blockedByPlatformPolicy` | Platform frequency limit reached                |
+| `conditionsNotMet`        | A condition returned false                      |
+| `reviewRequested`         | User was happy; OS review requested             |
+| `reviewRequestedDirect`   | No dialog adapter; OS review requested directly |
+| `feedbackSubmitted`       | User was unhappy; feedback collected            |
+| `remindLater`             | User chose to be reminded later                 |
+| `dialogDismissed`         | User dismissed without choosing                 |
+
+## Kill Switch
+
+Disable the library at runtime without redeploying (e.g., via remote config):
+
+```dart
+// At configure time:
+await HappyReview.instance.configure(
+  storageAdapter: myStorageAdapter,
+  enabled: false, // All logEvent calls return ReviewFlowResult.disabled.
+  // ...
+);
+
+// Or toggle at runtime:
+HappyReview.instance.setEnabled(remoteConfig.getBool('enable_review_prompt'));
+```
+
+## Query State
+
+Inspect internal state without triggering the review flow:
+
+```dart
+// How many times has this event been logged?
+final count = await HappyReview.instance.getEventCount('purchase_completed');
+
+// How many times has the review prompt been shown?
+final prompts = await HappyReview.instance.getPromptsShownCount();
+
+// When was the last prompt shown?
+final lastDate = await HappyReview.instance.getLastPromptDate();
+```
+
 ## Debug Mode
 
 Enable debug mode during development to observe the full pipeline via logs:
@@ -477,53 +343,24 @@ platformPolicy: const PlatformPolicy(
 ),
 ```
 
-## Kill Switch
+### Debug Panel
 
-Disable the library at runtime without redeploying (e.g., via remote config):
-
-```dart
-// At configure time:
-await HappyReview.instance.configure(
-  storageAdapter: myStorageAdapter,
-  enabled: false, // All logEvent calls return ReviewFlowResult.disabled.
-  // ...
-);
-
-// Or toggle at runtime:
-HappyReview.instance.setEnabled(remoteConfig.getBool('enable_review_prompt'));
-```
-
-## Query State
-
-Inspect internal state without triggering the review flow:
+Embed a `HappyReviewDebugPanel` widget in any screen to visualize the full pipeline state at a glance:
 
 ```dart
-// How many times has this event been logged?
-final count = await HappyReview.instance.getEventCount('purchase_completed');
-
-// How many times has the review prompt been shown?
-final prompts = await HappyReview.instance.getPromptsShownCount();
-
-// When was the last prompt shown?
-final lastDate = await HappyReview.instance.getLastPromptDate();
+const HappyReviewDebugPanel()
 ```
 
-## Return Values
+The panel shows: enabled status, triggers (with counts), prerequisites, platform policy, conditions,
+prompts shown, and last prompt date. It includes a refresh button and only renders in debug builds.
 
-`logEvent` returns a `ReviewFlowResult` so you know exactly what happened:
+You can also access the raw data programmatically:
 
-| Result                    | Meaning                                         |
-|---------------------------|-------------------------------------------------|
-| `disabled`                | Library is disabled via kill switch             |
-| `noTrigger`               | No trigger matched for this event               |
-| `prerequisitesNotMet`     | One or more prerequisites are not satisfied     |
-| `blockedByPlatformPolicy` | Platform frequency limit reached                |
-| `conditionsNotMet`        | A condition returned false                      |
-| `reviewRequested`         | User was happy; OS review requested             |
-| `reviewRequestedDirect`   | No dialog adapter; OS review requested directly |
-| `feedbackSubmitted`       | User was unhappy; feedback collected            |
-| `remindLater`             | User chose to be reminded later                 |
-| `dialogDismissed`         | User dismissed without choosing                 |
+```dart
+final snapshot = await HappyReview.instance.getDebugSnapshot();
+print(snapshot.triggers.first.currentCount); // e.g., 2
+print(snapshot.platformPolicyAllows); // true/false
+```
 
 ## Testing
 
@@ -553,10 +390,226 @@ await HappyReview.instance.configure(
 );
 ```
 
+## Use Cases
+
+<details>
+<summary><strong>E-Commerce</strong> — Review after successful purchases</summary>
+
+Ask for a review after the user has completed multiple purchases, ensuring they've experienced your
+core value proposition.
+
+```dart
+await HappyReview.instance.configure(
+  storageAdapter: myStorage,
+  triggers: [
+    const HappyTrigger(eventName: 'purchase_completed', minOccurrences: 3),
+  ],
+  prerequisites: [
+    const HappyTrigger(eventName: 'onboarding_finished', minOccurrences: 1),
+  ],
+  dialogAdapter: DefaultReviewDialogAdapter(),
+);
+
+// After a successful purchase:
+await HappyReview.instance.logEvent(context, 'purchase_completed');
+```
+
+</details>
+
+<details>
+<summary><strong>Fitness / Health</strong> — Review after achieving a streak</summary>
+
+Trigger the review when the user has proven consistency and is most engaged.
+
+```dart
+await HappyReview.instance.configure(
+  storageAdapter: myStorage,
+  triggers: [
+    const HappyTrigger(eventName: 'workout_completed', minOccurrences: 10),
+    const HappyTrigger(eventName: 'streak_7_days', minOccurrences: 1),
+  ],
+  conditions: [
+    const MinDaysAfterInstall(days: 14),
+    const CooldownPeriod(days: 90),
+  ],
+  dialogAdapter: DefaultReviewDialogAdapter(
+    preDialogConfig: const DefaultPreDialogConfig(
+      title: 'Crushing your goals!',
+      positiveLabel: 'Rate us!',
+      negativeLabel: 'Could be better',
+    ),
+  ),
+);
+```
+
+</details>
+
+<details>
+<summary><strong>Delivery / Logistics</strong> — Review after a successful delivery</summary>
+
+The user just received their order — peak satisfaction.
+
+```dart
+await HappyReview.instance.configure(
+  storageAdapter: myStorage,
+  triggers: [
+    const HappyTrigger(eventName: 'delivery_confirmed', minOccurrences: 2),
+  ],
+  conditions: [
+    const MinDaysAfterInstall(days: 7),
+    const MaxPromptsShown(maxPrompts: 3),
+    CustomCondition(
+      name: 'no_recent_complaint',
+      evaluate: () async => !(await supportRepo.hasOpenTicket()),
+    ),
+  ],
+  dialogAdapter: DefaultReviewDialogAdapter(),
+);
+```
+
+</details>
+
+<details>
+<summary><strong>SaaS / Productivity</strong> — Review after completing a key workflow</summary>
+
+Ask after the user has created content, exported a report, or hit a milestone.
+
+```dart
+await HappyReview.instance.configure(
+  storageAdapter: myStorage,
+  triggers: [
+    const HappyTrigger(eventName: 'report_exported', minOccurrences: 5),
+    const HappyTrigger(eventName: 'project_completed', minOccurrences: 1),
+  ],
+  prerequisites: [
+    const HappyTrigger(eventName: 'profile_setup', minOccurrences: 1),
+  ],
+  dialogAdapter: DefaultReviewDialogAdapter(
+    preDialogConfig: const DefaultPreDialogConfig(
+      title: 'How is your experience?',
+      positiveLabel: 'Great!',
+      negativeLabel: 'Not great',
+      remindLaterLabel: 'Ask me later',
+    ),
+  ),
+);
+```
+
+</details>
+
+<details>
+<summary><strong>Gaming</strong> — Review after winning or reaching a level</summary>
+
+Capture the dopamine hit right when the player is most excited.
+
+```dart
+await HappyReview.instance.configure(
+  storageAdapter: myStorage,
+  triggers: [
+    const HappyTrigger(eventName: 'level_completed', minOccurrences: 10),
+    const HappyTrigger(eventName: 'boss_defeated', minOccurrences: 1),
+  ],
+  conditions: [
+    const MinDaysAfterInstall(days: 3),
+    const CooldownPeriod(days: 60),
+  ],
+  dialogAdapter: DefaultReviewDialogAdapter(),
+);
+```
+
+</details>
+
+<details>
+<summary><strong>Education</strong> — Review after completing a course module</summary>
+
+The student just passed a test or finished a chapter — sense of accomplishment.
+
+```dart
+await HappyReview.instance.configure(
+  storageAdapter: myStorage,
+  triggers: [
+    const HappyTrigger(eventName: 'module_completed', minOccurrences: 3),
+    const HappyTrigger(eventName: 'certificate_earned', minOccurrences: 1),
+  ],
+  dialogAdapter: DefaultReviewDialogAdapter(
+    preDialogConfig: const DefaultPreDialogConfig(
+      title: 'Congrats on your progress!',
+      positiveLabel: 'Love learning here!',
+      negativeLabel: 'Needs improvement',
+    ),
+  ),
+);
+```
+
+</details>
+
+<details>
+<summary><strong>Direct OS review</strong> — No emotional filter</summary>
+
+Skip the pre-dialog entirely and request the OS review directly when triggers fire. Useful when
+you've already validated satisfaction through other means.
+
+```dart
+await HappyReview.instance.configure(
+  storageAdapter: myStorage,
+  triggers: [
+    const HappyTrigger(eventName: 'nps_score_9_or_10', minOccurrences: 1),
+  ],
+  // No dialogAdapter → OS review is requested directly.
+);
+```
+
+</details>
+
+<details>
+<summary><strong>Simple launch count</strong> — advanced_in_app_review style</summary>
+
+If you still prefer the launch-count approach (e.g., ask after 5 app opens), Happy Review supports
+it — though we recommend event-driven triggers for better results.
+
+```dart
+await HappyReview.instance.configure(
+  storageAdapter: myStorage,
+  triggers: [
+    const HappyTrigger(eventName: 'app_opened', minOccurrences: 5),
+  ],
+  // No dialogAdapter, no conditions — just launch count + OS review.
+);
+
+// Call on every app start:
+await HappyReview.instance.logEvent(context, 'app_opened');
+```
+
+</details>
+
+<details>
+<summary><strong>Remote kill switch</strong> — Firebase Remote Config</summary>
+
+Disable review prompts instantly without deploying a new version.
+
+```dart
+final remoteConfig = FirebaseRemoteConfig.instance;
+await remoteConfig.fetchAndActivate();
+
+await HappyReview.instance.configure(
+  storageAdapter: myStorage,
+  enabled: remoteConfig.getBool('enable_review_prompt'),
+  triggers: [
+    const HappyTrigger(eventName: 'purchase_completed', minOccurrences: 3),
+  ],
+  dialogAdapter: DefaultReviewDialogAdapter(),
+);
+
+// Or toggle at runtime:
+HappyReview.instance.setEnabled(remoteConfig.getBool('enable_review_prompt'));
+```
+
+</details>
+
 ## Full Example
 
 See the [example app](example/) for a complete working demo that simulates an e-commerce happy flow
-with prerequisites, debug mode, and kill switch.
+with prerequisites, debug panel, and kill switch.
 
 ## Contributing
 

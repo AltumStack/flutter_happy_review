@@ -4,9 +4,11 @@ import 'package:in_app_review/in_app_review.dart';
 import 'adapters/review_dialog_adapter.dart';
 import 'adapters/review_storage_adapter.dart';
 import 'conditions/cooldown_period.dart';
+import 'conditions/custom_condition.dart';
 import 'conditions/min_days_after_install.dart';
 import 'conditions/max_prompts_shown.dart';
 import 'conditions/review_condition.dart';
+import 'models/debug_snapshot.dart';
 import 'models/feedback_result.dart';
 import 'models/happy_trigger.dart';
 import 'models/platform_policy.dart';
@@ -247,6 +249,60 @@ class HappyReview {
     await _storageAdapter.clear();
     await MinDaysAfterInstall.recordInstallIfNeeded(_storageAdapter);
     _log('All state reset.');
+  }
+
+  /// Returns a snapshot of the library's internal state for debugging.
+  ///
+  /// Resolves current counts, prerequisite status, platform policy,
+  /// and condition evaluations into a single [DebugSnapshot].
+  Future<DebugSnapshot> getDebugSnapshot() async {
+    assert(_configured, 'Call HappyReview.instance.configure() first.');
+
+    final triggerStatuses = <TriggerStatus>[];
+    for (final t in _triggers) {
+      final count = await _storageAdapter.getInt('event_count_${t.eventName}');
+      triggerStatuses.add(TriggerStatus(
+        eventName: t.eventName,
+        minOccurrences: t.minOccurrences,
+        currentCount: count,
+      ));
+    }
+
+    final prereqStatuses = <TriggerStatus>[];
+    for (final p in _prerequisites) {
+      final count = await _storageAdapter.getInt('event_count_${p.eventName}');
+      prereqStatuses.add(TriggerStatus(
+        eventName: p.eventName,
+        minOccurrences: p.minOccurrences,
+        currentCount: count,
+      ));
+    }
+
+    final policyChecker = PlatformPolicyChecker(
+      rules: _platformPolicy.current,
+      storage: _storageAdapter,
+    );
+    final policyAllows = await policyChecker.canShow();
+
+    final conditionStatuses = <ConditionStatus>[];
+    for (final c in _conditions) {
+      final met = await c.evaluate(_storageAdapter);
+      final name = c is CustomCondition ? c.name : c.runtimeType.toString();
+      conditionStatuses.add(ConditionStatus(name: name, isMet: met));
+    }
+
+    return DebugSnapshot(
+      enabled: _enabled,
+      debugMode: _debugMode,
+      hasDialogAdapter: _dialogAdapter != null,
+      triggers: triggerStatuses,
+      prerequisites: prereqStatuses,
+      platformPolicyAllows: policyAllows,
+      conditions: conditionStatuses,
+      promptsShown: await _storageAdapter.getInt('prompts_shown_count'),
+      lastPromptDate: await _storageAdapter.getDateTime('last_prompt_date'),
+      installDate: await _storageAdapter.getDateTime('install_date'),
+    );
   }
 
   // -- Private --
