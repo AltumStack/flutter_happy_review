@@ -9,7 +9,7 @@
 > Read the full strategy behind this library: [The Art of Asking: In-App Review Strategy for Mobile Applications](https://medium.com/@amarturelo/the-art-of-asking-in-app-review-strategy-for-mobile-applications-67d4ccb9fce6)
 
 <p align="center">
-  <img src="doc/img.png" alt="Happy Review example app" width="300"/>
+  <img src="assets/example_screenshot.png" alt="Happy Review example app" width="300"/>
 </p>
 
 ## The Problem
@@ -610,6 +610,16 @@ HappyReview.instance.setEnabled(remoteConfig.getBool('enable_review_prompt'));
 
 See the [example app](example/) for a complete working demo that simulates an e-commerce happy flow
 with prerequisites, debug panel, and kill switch.
+
+## Context-First Development
+
+This project follows the [Context-First Development (CFD)](https://medium.com/@albertomarturelo/context-first-development-cfd-ingenier%C3%ADa-de-contexto-para-desarrollo-asistido-por-ia-en-cli-c2084742885a) methodology for AI-assisted development. The repository is structured so that AI agents can operate with persistent, accurate, and efficient context — reducing token waste and eliminating repeated explanations across sessions.
+
+Key elements:
+- `CLAUDE.md` — Root context index referencing specialized documents
+- `docs/` — Architecture, stack, conventions, and current project status
+- `docs/decisions/` — Architecture Decision Records (ADRs) for every significant choice
+- `.claude/commands/` — Slash commands for automated context maintenance
 
 ## Contributing
 
