@@ -3,7 +3,7 @@ I need to document a new architectural decision. Guide me through the following:
 1. Ask me what decision needs to be made
 2. Help me articulate the context (what problem are we solving?)
 3. Propose 2-3 alternatives with pros/cons
-4. Once I choose, generate a new ADR file in docs/decisions/ following this format:
+4. Once I choose, generate a new ADR file in doc/decisions/ following this format:
 
 ```markdown
 # ADR-[next number]: [Title]
@@ -27,7 +27,7 @@ Accepted
 [What changes as a result]
 ```
 
-Then update docs/decisions/_index.md with the new entry.
+Then update doc/decisions/_index.md with the new entry.
 
 Important:
 - Check _index.md first to determine the next ADR number

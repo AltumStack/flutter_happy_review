@@ -618,8 +618,8 @@ This project follows the [Context-First Development (CFD)](https://medium.com/@a
 
 Key elements:
 - `CLAUDE.md` — Root context index referencing specialized documents
-- `docs/` — Architecture, stack, conventions, and current project status
-- `docs/decisions/` — Architecture Decision Records (ADRs) for every significant choice
+- `doc/` — Architecture, stack, conventions, and current project status
+- `doc/decisions/` — Architecture Decision Records (ADRs) for every significant choice
 - `.claude/commands/` — Slash commands for automated context maintenance
 
 ## Contributing
