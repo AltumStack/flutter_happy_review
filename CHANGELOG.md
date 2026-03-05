@@ -1,6 +1,6 @@
 ## 0.2.1
 
-* **Fix:** Prevent multiple dialogs from stacking when `logEvent()` is called concurrently. A new `_isFlowInProgress` guard blocks concurrent flows while still incrementing event counts.
+* **Fix:** Prevent multiple dialogs from stacking when `logEvent()` is called concurrently ([#28](https://github.com/AltumStack/flutter_happy_review/issues/28)). A new `_isFlowInProgress` guard blocks concurrent flows while still incrementing event counts.
 * **New:** `ReviewFlowResult.flowAlreadyInProgress` — returned when a second `logEvent()` call arrives while a review flow is active.
 * **New:** `DebugSnapshot.isFlowInProgress` field and corresponding row in `HappyReviewDebugPanel`.
 
