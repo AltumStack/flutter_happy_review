@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:happy_review/happy_review.dart';
@@ -1203,6 +1205,236 @@ void main() {
         final afterReset =
             await HappyReview.instance.logEvent(context, 'purchase');
         expect(afterReset, equals(ReviewFlowResult.reviewRequested));
+      },
+    );
+  });
+
+  group('Concurrent flow prevention', () {
+    testWidgets(
+      'Given a flow is already in progress, '
+      'When a second logEvent is called, '
+      'Then it returns flowAlreadyInProgress',
+      (tester) async {
+        // Given — hold the first dialog open with a Completer.
+        final completer = Completer<PreDialogResult>();
+        when(() => dialogAdapter.showPreDialog(any()))
+            .thenAnswer((_) => completer.future);
+
+        await configureWith(
+          triggers: [
+            const HappyTrigger(
+                eventName: 'purchase', minOccurrences: 1),
+          ],
+          dialog: dialogAdapter,
+        );
+
+        await tester.pumpWidget(const MaterialApp(home: Scaffold()));
+        final context = tester.element(find.byType(Scaffold));
+
+        // Start first flow (will hang on the dialog).
+        final firstFuture =
+            HappyReview.instance.logEvent(context, 'purchase');
+
+        // When — fire second event while first is still showing dialog.
+        final secondResult =
+            await HappyReview.instance.logEvent(context, 'purchase');
+
+        // Then
+        expect(
+            secondResult, equals(ReviewFlowResult.flowAlreadyInProgress));
+
+        // Clean up — complete the first flow.
+        completer.complete(PreDialogResult.dismissed);
+        await firstFuture;
+      },
+    );
+
+    testWidgets(
+      'Given a flow is already in progress, '
+      'When a second logEvent is called, '
+      'Then the event count is still incremented',
+      (tester) async {
+        // Given
+        final completer = Completer<PreDialogResult>();
+        when(() => dialogAdapter.showPreDialog(any()))
+            .thenAnswer((_) => completer.future);
+
+        await configureWith(
+          triggers: [
+            const HappyTrigger(
+                eventName: 'purchase', minOccurrences: 1),
+          ],
+          dialog: dialogAdapter,
+        );
+
+        await tester.pumpWidget(const MaterialApp(home: Scaffold()));
+        final context = tester.element(find.byType(Scaffold));
+
+        // Start first flow.
+        final firstFuture =
+            HappyReview.instance.logEvent(context, 'purchase');
+
+        // Yield to let the first call progress past count increment
+        // and set the flag before the second call starts.
+        await tester.pump();
+
+        // Fire second event.
+        await HappyReview.instance.logEvent(context, 'purchase');
+
+        // Then — count should be 2 (both events counted).
+        final count =
+            await HappyReview.instance.getEventCount('purchase');
+        expect(count, equals(2));
+
+        // Clean up.
+        completer.complete(PreDialogResult.dismissed);
+        await firstFuture;
+      },
+    );
+
+    testWidgets(
+      'Given a flow completes, '
+      'When a new logEvent is called, '
+      'Then the flag is cleared and a new flow starts',
+      (tester) async {
+        // Given
+        when(() => dialogAdapter.showPreDialog(any()))
+            .thenAnswer((_) async => PreDialogResult.dismissed);
+
+        await configureWith(
+          triggers: [
+            const HappyTrigger(
+                eventName: 'purchase', minOccurrences: 1),
+          ],
+          dialog: dialogAdapter,
+        );
+
+        await tester.pumpWidget(const MaterialApp(home: Scaffold()));
+        final context = tester.element(find.byType(Scaffold));
+
+        // First flow completes normally.
+        final first =
+            await HappyReview.instance.logEvent(context, 'purchase');
+        expect(first, equals(ReviewFlowResult.dialogDismissed));
+
+        // When — second call should also succeed (flag is cleared).
+        final second =
+            await HappyReview.instance.logEvent(context, 'purchase');
+
+        // Then
+        expect(second, equals(ReviewFlowResult.dialogDismissed));
+        verify(() => dialogAdapter.showPreDialog(any())).called(2);
+      },
+    );
+
+    testWidgets(
+      'Given no dialog adapter (direct review path), '
+      'When two sequential logEvent calls are made, '
+      'Then both succeed because the flag clears after each',
+      (tester) async {
+        // Given
+        await configureWith(
+          triggers: [
+            const HappyTrigger(
+                eventName: 'purchase', minOccurrences: 1),
+          ],
+          dialog: null,
+        );
+
+        await tester.pumpWidget(const MaterialApp(home: Scaffold()));
+        final context = tester.element(find.byType(Scaffold));
+
+        // When
+        final first =
+            await HappyReview.instance.logEvent(context, 'purchase');
+        final second =
+            await HappyReview.instance.logEvent(context, 'purchase');
+
+        // Then
+        expect(first, equals(ReviewFlowResult.reviewRequestedDirect));
+        expect(second, equals(ReviewFlowResult.reviewRequestedDirect));
+      },
+    );
+
+    testWidgets(
+      'Given a flow is in progress, '
+      'When reset is called, '
+      'Then isFlowInProgress is cleared',
+      (tester) async {
+        // Given
+        final completer = Completer<PreDialogResult>();
+        when(() => dialogAdapter.showPreDialog(any()))
+            .thenAnswer((_) => completer.future);
+
+        await configureWith(
+          triggers: [
+            const HappyTrigger(
+                eventName: 'purchase', minOccurrences: 1),
+          ],
+          dialog: dialogAdapter,
+        );
+
+        await tester.pumpWidget(const MaterialApp(home: Scaffold()));
+        final context = tester.element(find.byType(Scaffold));
+
+        // Start a flow (will hang on dialog).
+        final firstFuture =
+            HappyReview.instance.logEvent(context, 'purchase');
+
+        // Yield to let the first call progress through awaits and set the flag.
+        await tester.pump();
+        expect(HappyReview.instance.isFlowInProgress, isTrue);
+
+        // When
+        await HappyReview.instance.reset();
+
+        // Then
+        expect(HappyReview.instance.isFlowInProgress, isFalse);
+
+        // Clean up.
+        completer.complete(PreDialogResult.dismissed);
+        await firstFuture;
+      },
+    );
+
+    testWidgets(
+      'Given a flow is in progress for event A, '
+      'When logEvent is called for a different event B, '
+      'Then event B is also blocked',
+      (tester) async {
+        // Given
+        final completer = Completer<PreDialogResult>();
+        when(() => dialogAdapter.showPreDialog(any()))
+            .thenAnswer((_) => completer.future);
+
+        await configureWith(
+          triggers: [
+            const HappyTrigger(
+                eventName: 'purchase', minOccurrences: 1),
+            const HappyTrigger(
+                eventName: 'workout', minOccurrences: 1),
+          ],
+          dialog: dialogAdapter,
+        );
+
+        await tester.pumpWidget(const MaterialApp(home: Scaffold()));
+        final context = tester.element(find.byType(Scaffold));
+
+        // Start flow for event A.
+        final firstFuture =
+            HappyReview.instance.logEvent(context, 'purchase');
+
+        // When — fire event B while A is in progress.
+        final secondResult =
+            await HappyReview.instance.logEvent(context, 'workout');
+
+        // Then
+        expect(
+            secondResult, equals(ReviewFlowResult.flowAlreadyInProgress));
+
+        // Clean up.
+        completer.complete(PreDialogResult.dismissed);
+        await firstFuture;
       },
     );
   });

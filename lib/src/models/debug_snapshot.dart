@@ -12,6 +12,9 @@ class DebugSnapshot {
   /// Whether a dialog adapter is configured.
   final bool hasDialogAdapter;
 
+  /// Whether a review flow is currently in progress.
+  final bool isFlowInProgress;
+
   /// Status of each configured trigger.
   final List<TriggerStatus> triggers;
 
@@ -37,6 +40,7 @@ class DebugSnapshot {
     required this.enabled,
     required this.debugMode,
     required this.hasDialogAdapter,
+    required this.isFlowInProgress,
     required this.triggers,
     required this.prerequisites,
     required this.platformPolicyAllows,
