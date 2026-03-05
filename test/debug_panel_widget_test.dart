@@ -114,7 +114,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('No'), findsOneWidget); // disabled
+      expect(find.text('No'), findsNWidgets(2)); // disabled + flow not in progress
       expect(find.text('None (direct review)'), findsOneWidget); // no adapter
     });
 

@@ -67,6 +67,7 @@ void main() {
       expect(snapshot.enabled, isTrue);
       expect(snapshot.debugMode, isTrue);
       expect(snapshot.hasDialogAdapter, isTrue);
+      expect(snapshot.isFlowInProgress, isFalse);
       expect(snapshot.promptsShown, equals(0));
       expect(snapshot.lastPromptDate, isNull);
       expect(snapshot.installDate, isNotNull);

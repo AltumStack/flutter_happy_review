@@ -10,6 +10,7 @@ Last updated: 2026-03-04
 
 ## Recently Completed
 
+- [x] Prevent multiple dialogs when `logEvent()` is called concurrently
 - [x] Debug dashboard widget and `getDebugSnapshot()` (#24)
 - [x] Export test utilities (`FakeStorageAdapter`, `FakeDialogAdapter`) (#23)
 - [x] macOS platform policy support (#22)

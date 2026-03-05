@@ -4,6 +4,10 @@ enum ReviewFlowResult {
   /// `enabled` parameter in [HappyReview.configure].
   disabled,
 
+  /// Another review flow is already in progress.
+  /// The event count was still incremented.
+  flowAlreadyInProgress,
+
   /// No trigger matched for this event.
   noTrigger,
 

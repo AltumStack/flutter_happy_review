@@ -93,6 +93,11 @@ class _HappyReviewDebugPanelState extends State<HappyReviewDebugPanel> {
               snapshot.hasDialogAdapter ? 'Configured' : 'None (direct review)',
             ),
             _buildRow(
+              'Flow in progress',
+              snapshot.isFlowInProgress ? 'Yes' : 'No',
+              snapshot.isFlowInProgress ? Colors.orange : null,
+            ),
+            _buildRow(
               'Prompts shown',
               '${snapshot.promptsShown}',
             ),
