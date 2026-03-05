@@ -54,11 +54,18 @@ class HappyReview {
   bool _configured = false;
   bool _enabled = true;
   bool _debugMode = false;
+  bool _isFlowInProgress = false;
   InAppReview _inAppReview = InAppReview.instance;
 
   /// Overrides the [InAppReview] instance used internally.
   ///
   /// This is exposed only for testing purposes.
+  /// Whether a review flow is currently being executed.
+  ///
+  /// This is exposed only for testing purposes.
+  @visibleForTesting
+  bool get isFlowInProgress => _isFlowInProgress;
+
   @visibleForTesting
   // ignore: use_setters_to_change_properties
   void setInAppReviewInstance(InAppReview instance) =>
@@ -123,6 +130,7 @@ class HappyReview {
     _onPreDialogDismissed = onPreDialogDismissed;
     _onReviewRequested = onReviewRequested;
     _onFeedbackSubmitted = onFeedbackSubmitted;
+    _isFlowInProgress = false;
     _configured = true;
 
     // Record install date on first configure.
@@ -173,51 +181,64 @@ class HappyReview {
 
     _log('Event "$eventName" logged ($newCount total).');
 
-    // 2. Check if any trigger for this event is met.
-    final matchingTrigger = _triggers
-        .where((t) => t.eventName == eventName && newCount >= t.minOccurrences)
-        .firstOrNull;
-
-    if (matchingTrigger == null) {
-      _log('No trigger matched for "$eventName".');
-      return ReviewFlowResult.noTrigger;
+    if (_isFlowInProgress) {
+      _log('Flow already in progress — skipping pipeline for "$eventName".');
+      return ReviewFlowResult.flowAlreadyInProgress;
     }
 
-    _log('Trigger matched: ${matchingTrigger.eventName} '
-        '(needs ${matchingTrigger.minOccurrences}, has $newCount).');
+    _isFlowInProgress = true;
+    try {
+      // 2. Check if any trigger for this event is met.
+      final matchingTrigger = _triggers
+          .where(
+              (t) => t.eventName == eventName && newCount >= t.minOccurrences)
+          .firstOrNull;
 
-    // 3. Check prerequisites (AND — all must be met).
-    for (final prereq in _prerequisites) {
-      final prereqCount =
-          await _storageAdapter.getInt('event_count_${prereq.eventName}');
-      if (prereqCount < prereq.minOccurrences) {
-        _log('Prerequisite not met: "${prereq.eventName}" '
-            '(needs ${prereq.minOccurrences}, has $prereqCount).');
-        return ReviewFlowResult.prerequisitesNotMet;
+      if (matchingTrigger == null) {
+        _log('No trigger matched for "$eventName".');
+        return ReviewFlowResult.noTrigger;
       }
-    }
 
-    // 4. Check platform policy.
-    final policyChecker = PlatformPolicyChecker(
-      rules: _platformPolicy.current,
-      storage: _storageAdapter,
-    );
-    if (!await policyChecker.canShow()) {
-      _log('Blocked by platform policy.');
-      return ReviewFlowResult.blockedByPlatformPolicy;
-    }
+      _log('Trigger matched: ${matchingTrigger.eventName} '
+          '(needs ${matchingTrigger.minOccurrences}, has $newCount).');
 
-    // 5. Check custom conditions.
-    for (final condition in _conditions) {
-      if (!await condition.evaluate(_storageAdapter)) {
-        _log('Condition not met: ${condition.runtimeType}.');
-        return ReviewFlowResult.conditionsNotMet;
+      // 3. Check prerequisites (AND — all must be met).
+      for (final prereq in _prerequisites) {
+        final prereqCount =
+            await _storageAdapter.getInt('event_count_${prereq.eventName}');
+        if (prereqCount < prereq.minOccurrences) {
+          _log('Prerequisite not met: "${prereq.eventName}" '
+              '(needs ${prereq.minOccurrences}, has $prereqCount).');
+          return ReviewFlowResult.prerequisitesNotMet;
+        }
       }
-    }
 
-    // 6. Run the review flow.
-    if (!context.mounted) return ReviewFlowResult.dialogDismissed;
-    return _executeFlow(context, policyChecker);
+      // 4. Check platform policy.
+      final policyChecker = PlatformPolicyChecker(
+        rules: _platformPolicy.current,
+        storage: _storageAdapter,
+      );
+      if (!await policyChecker.canShow()) {
+        _log('Blocked by platform policy.');
+        return ReviewFlowResult.blockedByPlatformPolicy;
+      }
+
+      // 5. Check custom conditions.
+      for (final condition in _conditions) {
+        if (!await condition.evaluate(_storageAdapter)) {
+          _log('Condition not met: ${condition.runtimeType}.');
+          return ReviewFlowResult.conditionsNotMet;
+        }
+      }
+
+      // 6. Run the review flow.
+      if (!context.mounted) return ReviewFlowResult.dialogDismissed;
+      // Use `await` so the finally block runs after the flow completes,
+      // not immediately after _executeFlow is called.
+      return await _executeFlow(context, policyChecker);
+    } finally {
+      _isFlowInProgress = false;
+    }
   }
 
   // -- Query methods --
@@ -247,6 +268,7 @@ class HappyReview {
   Future<void> reset() async {
     assert(_configured, 'Call HappyReview.instance.configure() first.');
     await _storageAdapter.clear();
+    _isFlowInProgress = false;
     await MinDaysAfterInstall.recordInstallIfNeeded(_storageAdapter);
     _log('All state reset.');
   }
@@ -295,6 +317,7 @@ class HappyReview {
       enabled: _enabled,
       debugMode: _debugMode,
       hasDialogAdapter: _dialogAdapter != null,
+      isFlowInProgress: _isFlowInProgress,
       triggers: triggerStatuses,
       prerequisites: prereqStatuses,
       platformPolicyAllows: policyAllows,
