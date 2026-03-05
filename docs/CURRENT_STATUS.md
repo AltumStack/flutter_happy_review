@@ -4,13 +4,12 @@ Last updated: 2026-03-04
 
 ## In Progress
 
-- [ ] Implementing Context-First Development (CFD) methodology
-  - Structuring docs/, decisions/, and slash commands
-  - Restructuring CLAUDE.md as Level 0 index
+- [ ] Release 0.2.1 candidate (`release/0.2.1` branch ready for review)
 
 ## Recently Completed
 
-- [x] Prevent multiple dialogs when `logEvent()` is called concurrently
+- [x] Prevent multiple dialogs when `logEvent()` is called concurrently (#28, PR #27)
+- [x] Context-First Development (CFD) methodology (#26)
 - [x] Debug dashboard widget and `getDebugSnapshot()` (#24)
 - [x] Export test utilities (`FakeStorageAdapter`, `FakeDialogAdapter`) (#23)
 - [x] macOS platform policy support (#22)
