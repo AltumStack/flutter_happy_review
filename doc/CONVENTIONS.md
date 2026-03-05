@@ -39,7 +39,7 @@
 - `lib/testing.dart` — test utilities barrel (fakes for consumer tests)
 - `lib/src/` — all implementation files (never import `src/` directly)
 - `assets/` — Project assets (screenshots, images)
-- `docs/` — CFD context documents (architecture, decisions, status)
+- `doc/` — CFD context documents (architecture, decisions, status)
 
 ## Naming
 

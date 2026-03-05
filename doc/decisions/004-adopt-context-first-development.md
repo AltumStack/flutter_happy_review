@@ -17,12 +17,12 @@ As the project grows, AI-assisted development sessions start without context abo
 Adopt Context-First Development (CFD) methodology with:
 
 1. **CLAUDE.md as Level 0 index** — compact root file (~100-150 lines) that references specialized documents
-2. **Level 1 domain documents** in `docs/`:
+2. **Level 1 domain documents** in `doc/`:
    - `ARCHITECTURE.md` — system diagram, layers, module map
    - `STACK.md` — technologies and versions
    - `CONVENTIONS.md` — code style, testing, git, naming
    - `CURRENT_STATUS.md` — dynamic file updated every session
-3. **Level 2 decisions** in `docs/decisions/` — ADRs with strict format
+3. **Level 2 decisions** in `doc/decisions/` — ADRs with strict format
 4. **Slash commands** in `.claude/commands/` — automated context maintenance
 
 Key principles applied:
@@ -40,6 +40,6 @@ Key principles applied:
 ## Consequences
 
 - Every session starts with accurate, structured context (~500-1,500 tokens vs 20,000+ for code scanning)
-- New contributors (human or AI) can orient themselves from docs/ without reading source code
+- New contributors (human or AI) can orient themselves from doc/ without reading source code
 - Small overhead per session (start + close routine ~5-8 minutes)
 - ADRs create persistent memory of why decisions were made

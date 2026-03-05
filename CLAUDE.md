@@ -6,23 +6,23 @@ Flutter package that replaces launch-count-based in-app review prompts with an e
 
 ## Architecture
 
-@docs/ARCHITECTURE.md
+@doc/ARCHITECTURE.md
 
 ## Tech Stack
 
-@docs/STACK.md
+@doc/STACK.md
 
 ## Conventions
 
-@docs/CONVENTIONS.md
+@doc/CONVENTIONS.md
 
 ## Current Status
 
-@docs/CURRENT_STATUS.md
+@doc/CURRENT_STATUS.md
 
 ## Key Decisions
 
-@docs/decisions/_index.md
+@doc/decisions/_index.md
 
 ## Build & Run
 
@@ -53,8 +53,8 @@ The example app is at `happy_review/example/` and can be run with `flutter run` 
 - All PRs target `develop`, never `main`
 - No `Co-Authored-By` lines in commits — this is a community open-source library
 - Library tests (`test/`) are for library internals only; example tests (`example/test/`) are for end-to-end scenarios
-- Update `docs/CURRENT_STATUS.md` at the end of every work session
-- Document significant technical decisions as ADRs in `docs/decisions/`
+- Update `doc/CURRENT_STATUS.md` at the end of every work session
+- Document significant technical decisions as ADRs in `doc/decisions/`
 
 ## Repository Structure Note
 

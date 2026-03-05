@@ -38,9 +38,17 @@ jobs:
       - name: 🚀 Install Dependencies
         run: flutter pub get
 
+      # Analyze Code
+      - name: 🔍 Analyze Code
+        run: flutter analyze
+
       # Run Tests with Code Coverage
       - name: ✅ Run Unit Tests with Coverage
         run: flutter test --coverage
+
+      # Verify Package is Ready to Publish
+      - name: 📦 Verify Package
+        run: dart pub publish --dry-run
 
       # Upload Coverage Report as Artifact
       - name: 📊 Upload Coverage Report
