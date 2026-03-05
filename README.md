@@ -46,7 +46,7 @@ logEvent() -> Trigger met? -> Prerequisites OK? -> Platform policy OK? -> Condit
 
 ```yaml
 dependencies:
-  happy_review: ^0.2.0
+  happy_review: ^0.2.1
 ```
 
 ## Platform Support
@@ -263,6 +263,7 @@ copy directly into your project.
 | Result                    | Meaning                                         |
 |---------------------------|-------------------------------------------------|
 | `disabled`                | Library is disabled via kill switch             |
+| `flowAlreadyInProgress`   | Another review flow is active; event was counted |
 | `noTrigger`               | No trigger matched for this event               |
 | `prerequisitesNotMet`     | One or more prerequisites are not satisfied     |
 | `blockedByPlatformPolicy` | Platform frequency limit reached                |
