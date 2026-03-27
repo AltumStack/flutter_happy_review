@@ -11,6 +11,10 @@ enum ReviewFlowResult {
   /// No trigger matched for this event.
   noTrigger,
 
+  /// A trigger matched but the user recently chose "remind me later"
+  /// or dismissed the dialog, and the snooze cooldown has not expired.
+  snoozed,
+
   /// A trigger matched but one or more prerequisites were not met.
   prerequisitesNotMet,
 
@@ -36,4 +40,8 @@ enum ReviewFlowResult {
 
   /// No dialog adapter was configured; the OS review was requested directly.
   reviewRequestedDirect,
+
+  /// The user responded positively but the OS in-app review was not
+  /// available on this device (e.g., emulator, no store installed).
+  reviewNotAvailable,
 }
