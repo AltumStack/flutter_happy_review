@@ -252,6 +252,26 @@ void main() {
       expect(find.text('Off'), findsOneWidget); // debug mode off
     });
 
+    testWidgets('shows active snooze state', (tester) async {
+      await HappyReview.instance.configure(
+        storageAdapter: storage,
+        triggers: [
+          const HappyTrigger(eventName: 'purchase', minOccurrences: 1),
+        ],
+        platformPolicy: relaxedPolicy,
+        remindLaterCooldown: const Duration(hours: 6),
+      );
+
+      await storage.setDateTime('remind_later_date', DateTime.now());
+
+      await tester.pumpWidget(
+        const MaterialApp(home: Scaffold(body: HappyReviewDebugPanel())),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Until'), findsOneWidget);
+    });
+
     testWidgets('renders without triggers, prerequisites, or conditions',
         (tester) async {
       await HappyReview.instance.configure(
