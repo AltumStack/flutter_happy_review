@@ -11,6 +11,10 @@ enum ReviewFlowResult {
   /// No trigger matched for this event.
   noTrigger,
 
+  /// A trigger matched but the user recently chose "remind me later"
+  /// or dismissed the dialog, and the snooze cooldown has not expired.
+  snoozed,
+
   /// A trigger matched but one or more prerequisites were not met.
   prerequisitesNotMet,
 

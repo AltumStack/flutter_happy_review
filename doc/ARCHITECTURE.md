@@ -21,6 +21,10 @@ Consumer App
 │              └────────┬────────┘                    │
 │                       ▼                             │
 │              ┌─────────────────┐                    │
+│              │ Snooze Active?  │  (remind later)    │
+│              └────────┬────────┘                    │
+│                       ▼                             │
+│              ┌─────────────────┐                    │
 │              │ Prerequisites?  │  (AND logic)       │
 │              └────────┬────────┘                    │
 │                       ▼                             │
@@ -88,7 +92,7 @@ Each stage returns a specific `ReviewFlowResult` enum value on failure, preventi
 
 ### Debug Mode
 
-When enabled, bypasses prerequisites, platform policy, and conditions. Only trigger matching is evaluated. The `HappyReviewDebugPanel` widget visualizes internal state.
+When enabled, bypasses snooze, prerequisites, platform policy, and conditions. Only trigger matching is evaluated. The `HappyReviewDebugPanel` widget visualizes internal state.
 
 ## Storage Keys
 
@@ -100,5 +104,6 @@ The library writes these keys to `ReviewStorageAdapter`:
 | `prompts_shown_count` | int | Total prompts shown |
 | `last_prompt_date` | DateTime | Last prompt timestamp |
 | `install_date` | DateTime | First `configure()` date |
+| `remind_later_date` | DateTime | Last "remind later" or dismiss timestamp |
 | `platform_last_prompt` | DateTime | Last prompt for policy check |
 | `platform_prompt_timestamps` | String | Comma-separated ms timestamps |

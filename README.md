@@ -33,20 +33,22 @@ Happy Review replaces the launch counter with an **event-driven** approach:
    to the OS review and captures feedback from unsatisfied users — privately.
 
 ```text
-logEvent() -> Trigger met? -> Prerequisites OK? -> Platform policy OK? -> Conditions pass?
-                                                                              |
-                                                                       Pre-dialog shown
-                                                                      /       |        \
-                                                                Positive   Later    Negative
-                                                                   |         |          |
-                                                            OS Review    Skip      Feedback form
+logEvent() -> Trigger met? -> Snoozed? -> Prerequisites OK? -> Platform policy OK? -> Conditions pass?
+                                                                                           |
+                                                                                    Pre-dialog shown
+                                                                                   /       |        \
+                                                                             Positive   Later    Negative
+                                                                                |         |          |
+                                                                          OS Review    Snooze   Feedback form
+                                                                          + reset      cooldown   + reset
+                                                                          counter                 counter
 ```
 
 ## Installation
 
 ```yaml
 dependencies:
-  happy_review: ^0.2.0
+  happy_review: ^0.3.0
 ```
 
 ## Platform Support
@@ -75,6 +77,32 @@ await HappyReview.instance.logEvent(context, 'purchase_completed');
 
 That's it. After 3 purchases, the pre-dialog appears. If the user responds positively, the OS review
 is requested. If negatively, a feedback form is shown.
+
+### What happens after each response?
+
+Happy Review automatically protects the user experience after every dialog interaction:
+
+- **Positive or Negative** — The trigger's event counter resets to zero. The user must reach `minOccurrences` again before the dialog can fire. Platform policy enforces an additional time-based cooldown (60–120 days depending on platform).
+- **Remind me later or Dismissed** — A snooze cooldown activates, blocking the dialog for a configurable duration (default: 1 day). Event counters are preserved so the dialog can fire immediately after the snooze expires.
+
+This means `minOccurrences` represents **how many happy events between each prompt**, not just the first one.
+
+### Snooze Cooldown
+
+Control how long to wait after a user chooses "remind me later" or dismisses the dialog:
+
+```dart
+await HappyReview.instance.configure(
+  storageAdapter: myStorage,
+  triggers: [
+    const HappyTrigger(eventName: 'purchase_completed', minOccurrences: 3),
+  ],
+  dialogAdapter: DefaultReviewDialogAdapter(),
+  remindLaterCooldown: const Duration(days: 3), // Default: 1 day.
+);
+```
+
+The snooze is bypassed in debug mode.
 
 ## Configuration
 
@@ -260,18 +288,19 @@ copy directly into your project.
 
 `logEvent` returns a `ReviewFlowResult` so you know exactly what happened:
 
-| Result                    | Meaning                                         |
-|---------------------------|-------------------------------------------------|
-| `disabled`                | Library is disabled via kill switch             |
-| `noTrigger`               | No trigger matched for this event               |
-| `prerequisitesNotMet`     | One or more prerequisites are not satisfied     |
-| `blockedByPlatformPolicy` | Platform frequency limit reached                |
-| `conditionsNotMet`        | A condition returned false                      |
-| `reviewRequested`         | User was happy; OS review requested             |
-| `reviewRequestedDirect`   | No dialog adapter; OS review requested directly |
-| `feedbackSubmitted`       | User was unhappy; feedback collected            |
-| `remindLater`             | User chose to be reminded later                 |
-| `dialogDismissed`         | User dismissed without choosing                 |
+| Result                    | Meaning                                              |
+|---------------------------|------------------------------------------------------|
+| `disabled`                | Library is disabled via kill switch                  |
+| `noTrigger`               | No trigger matched for this event                    |
+| `snoozed`                 | Trigger matched but snooze cooldown is active        |
+| `prerequisitesNotMet`     | One or more prerequisites are not satisfied          |
+| `blockedByPlatformPolicy` | Platform frequency limit reached                     |
+| `conditionsNotMet`        | A condition returned false                           |
+| `reviewRequested`         | User was happy; OS review requested; counter reset   |
+| `reviewRequestedDirect`   | No dialog adapter; OS review requested; counter reset|
+| `feedbackSubmitted`       | User was unhappy; feedback collected; counter reset  |
+| `remindLater`             | User chose to be reminded later; snooze activated    |
+| `dialogDismissed`         | User dismissed without choosing; snooze activated    |
 
 ## Kill Switch
 

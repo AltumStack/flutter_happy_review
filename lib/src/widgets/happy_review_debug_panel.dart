@@ -109,6 +109,13 @@ class _HappyReviewDebugPanelState extends State<HappyReviewDebugPanel> {
               'Install date',
               snapshot.installDate?.toLocal().toString() ?? 'Not recorded',
             ),
+            _buildRow(
+              'Snoozed',
+              snapshot.isSnoozed
+                  ? 'Until ${snapshot.snoozeUntil!.toLocal()}'
+                  : 'No',
+              snapshot.isSnoozed ? Colors.orange : null,
+            ),
             if (snapshot.triggers.isNotEmpty) ...[
               const SizedBox(height: 8),
               Text('Triggers (OR)', style: theme.textTheme.labelLarge),

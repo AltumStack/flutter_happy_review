@@ -1,3 +1,11 @@
+## 0.3.0
+
+* **New:** Snooze mechanism — when the user chooses "remind me later" or dismisses the dialog, a configurable cooldown prevents immediate re-prompting. Configure via `remindLaterCooldown` in `configure()` (defaults to 1 day).
+* **New:** Trigger counter resets on engagement — after a positive or negative response, the event counter for the matched trigger resets to zero. The user must reach `minOccurrences` again before the dialog can fire, combined with platform policy for time-based protection.
+* **New:** `ReviewFlowResult.snoozed` indicates the flow was blocked by an active snooze cooldown.
+* **New:** `DebugSnapshot` includes `isSnoozed` and `snoozeUntil` fields; the debug panel displays snooze state.
+* **Breaking:** `ReviewFlowResult` has a new enum value `snoozed`. Exhaustive `switch` statements must add a case for it.
+
 ## 0.2.0
 
 * **Fix:** "Remind later" and "dismissed" no longer count as a shown prompt. Previously, platform policy, cooldown, and max prompts counters were incremented before the dialog was shown — burning a prompt slot even when the user didn't engage. Now, counters are only updated on positive or negative responses.

@@ -36,6 +36,12 @@ class DebugSnapshot {
   /// Date the library was first configured (install date).
   final DateTime? installDate;
 
+  /// Whether the snooze cooldown is currently active.
+  final bool isSnoozed;
+
+  /// When the current snooze expires, or `null` if not snoozed.
+  final DateTime? snoozeUntil;
+
   const DebugSnapshot({
     required this.enabled,
     required this.debugMode,
@@ -48,6 +54,8 @@ class DebugSnapshot {
     required this.promptsShown,
     required this.lastPromptDate,
     required this.installDate,
+    required this.isSnoozed,
+    required this.snoozeUntil,
   });
 }
 
