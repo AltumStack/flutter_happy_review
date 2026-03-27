@@ -293,6 +293,7 @@ copy directly into your project.
 | Result                    | Meaning                                              |
 |---------------------------|------------------------------------------------------|
 | `disabled`                | Library is disabled via kill switch                  |
+| `flowAlreadyInProgress`   | Another review flow is already in progress           |
 | `noTrigger`               | No trigger matched for this event                    |
 | `snoozed`                 | Trigger matched but snooze cooldown is active        |
 | `prerequisitesNotMet`     | One or more prerequisites are not satisfied          |

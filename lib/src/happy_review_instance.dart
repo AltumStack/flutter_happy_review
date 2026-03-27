@@ -376,6 +376,7 @@ class HappyReview {
         _log('OS review requested directly (no dialog adapter).');
         return ReviewFlowResult.reviewRequestedDirect;
       } else {
+        await _clearSnooze();
         // Nothing was shown to the user — don't count anything.
         _log('OS review not available (no dialog adapter).');
         return ReviewFlowResult.reviewNotAvailable;
@@ -387,10 +388,10 @@ class HappyReview {
     // prevents immediate re-prompting on next launch.
     await _activateSnooze();
 
+    if (!context.mounted) return ReviewFlowResult.dialogDismissed;
+
     _onPreDialogShown?.call();
     _log('Showing pre-dialog.');
-
-    if (!context.mounted) return ReviewFlowResult.dialogDismissed;
 
     final preResult = await _dialogAdapter!.showPreDialog(context);
 

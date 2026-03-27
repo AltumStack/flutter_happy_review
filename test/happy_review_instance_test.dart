@@ -1994,6 +1994,80 @@ void main() {
         expect(callbackCalled, isFalse);
       },
     );
+
+    testWidgets(
+      'Given no dialog adapter, OS review not available, non-zero cooldown, '
+      'When logEvent is called again, '
+      'Then flow is NOT blocked by stale snooze',
+      (tester) async {
+        // First call: not available.
+        when(() => mockInAppReview.isAvailable())
+            .thenAnswer((_) async => false);
+
+        await configureWith(
+          triggers: [
+            const HappyTrigger(eventName: 'purchase', minOccurrences: 1),
+          ],
+          // No dialog adapter.
+          debugMode: false,
+          remindLaterCooldown: const Duration(hours: 12),
+        );
+
+        await tester.pumpWidget(const MaterialApp(home: Scaffold()));
+        final context = tester.element(find.byType(Scaffold));
+
+        final first =
+            await HappyReview.instance.logEvent(context, 'purchase');
+        expect(first, equals(ReviewFlowResult.reviewNotAvailable));
+
+        // Second call: now available — should NOT be blocked by snooze.
+        when(() => mockInAppReview.isAvailable())
+            .thenAnswer((_) async => true);
+
+        final second =
+            await HappyReview.instance.logEvent(context, 'purchase');
+        expect(second, equals(ReviewFlowResult.reviewRequestedDirect));
+      },
+    );
+
+    testWidgets(
+      'Given user was positive but OS review not available, '
+      'When logEvent is called again after cooldown, '
+      'Then the flow re-triggers without needing more events',
+      (tester) async {
+        when(() => dialogAdapter.showPreDialog(any()))
+            .thenAnswer((_) async => PreDialogResult.positive);
+
+        // First call: not available.
+        when(() => mockInAppReview.isAvailable())
+            .thenAnswer((_) async => false);
+
+        await configureWith(
+          triggers: [
+            const HappyTrigger(eventName: 'purchase', minOccurrences: 2),
+          ],
+          dialog: dialogAdapter,
+          debugMode: false,
+          remindLaterCooldown: Duration.zero,
+        );
+
+        await tester.pumpWidget(const MaterialApp(home: Scaffold()));
+        final context = tester.element(find.byType(Scaffold));
+
+        await HappyReview.instance.logEvent(context, 'purchase');
+        final first =
+            await HappyReview.instance.logEvent(context, 'purchase');
+        expect(first, equals(ReviewFlowResult.reviewNotAvailable));
+
+        // Counter was preserved (2), so next event triggers again.
+        when(() => mockInAppReview.isAvailable())
+            .thenAnswer((_) async => true);
+
+        final second =
+            await HappyReview.instance.logEvent(context, 'purchase');
+        expect(second, equals(ReviewFlowResult.reviewRequested));
+      },
+    );
   });
 
   group('App kill safety net', () {

@@ -4,7 +4,7 @@
 * **New:** Trigger counter resets on engagement — after a positive or negative response, the event counter for the matched trigger resets to zero. The user must reach `minOccurrences` again before the dialog can fire, combined with platform policy for time-based protection.
 * **New:** `ReviewFlowResult.snoozed` indicates the flow was blocked by an active snooze cooldown.
 * **New:** `DebugSnapshot` includes `isSnoozed` and `snoozeUntil` fields; the debug panel displays snooze state.
-* **Fix:** Prompt slot and trigger counter are no longer consumed when the OS in-app review is unavailable. Returns `ReviewFlowResult.reviewNotAvailable` instead.
+* **Fix:** Trigger counter is no longer reset when the OS in-app review is unavailable. Returns `ReviewFlowResult.reviewNotAvailable`. When a pre-dialog was shown, the prompt is still recorded (the user did interact); when no dialog adapter is configured, nothing is recorded.
 * **Fix:** Pre-emptive snooze safety net — if the app is killed while the dialog is visible, the snooze prevents immediate re-prompting on next launch.
 * **Fix:** Debug mode no longer bypasses the snooze check. It only enables logging, consistent with all other pipeline stages.
 * **Breaking:** `ReviewFlowResult` has new enum values `snoozed` and `reviewNotAvailable`. Exhaustive `switch` statements must handle both.
