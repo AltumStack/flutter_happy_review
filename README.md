@@ -82,8 +82,10 @@ is requested. If negatively, a feedback form is shown.
 
 Happy Review automatically protects the user experience after every dialog interaction:
 
-- **Positive or Negative** — The trigger's event counter resets to zero. The user must reach `minOccurrences` again before the dialog can fire. Platform policy enforces an additional time-based cooldown (60–120 days depending on platform).
+- **Positive** — If the OS review is available, the trigger counter resets and the review is requested. If not available (e.g., emulator), the counter is preserved and `reviewNotAvailable` is returned so the user can try again later.
+- **Negative** — The trigger counter resets to zero. Feedback dialog is shown.
 - **Remind me later or Dismissed** — A snooze cooldown activates, blocking the dialog for a configurable duration (default: 1 day). Event counters are preserved so the dialog can fire immediately after the snooze expires.
+- **App killed while dialog visible** — A pre-emptive snooze is activated before the dialog is shown. If the app is killed mid-dialog, the snooze prevents immediate re-prompting on next launch.
 
 This means `minOccurrences` represents **how many happy events between each prompt**, not just the first one.
 
@@ -102,7 +104,7 @@ await HappyReview.instance.configure(
 );
 ```
 
-The snooze is bypassed in debug mode.
+The snooze is enforced in all modes, including debug mode.
 
 ## Configuration
 
