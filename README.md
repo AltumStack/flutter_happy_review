@@ -298,6 +298,7 @@ copy directly into your project.
 | `conditionsNotMet`        | A condition returned false                           |
 | `reviewRequested`         | User was happy; OS review requested; counter reset   |
 | `reviewRequestedDirect`   | No dialog adapter; OS review requested; counter reset|
+| `reviewNotAvailable`      | User was positive but OS review not available         |
 | `feedbackSubmitted`       | User was unhappy; feedback collected; counter reset  |
 | `remindLater`             | User chose to be reminded later; snooze activated    |
 | `dialogDismissed`         | User dismissed without choosing; snooze activated    |

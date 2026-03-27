@@ -40,4 +40,8 @@ enum ReviewFlowResult {
 
   /// No dialog adapter was configured; the OS review was requested directly.
   reviewRequestedDirect,
+
+  /// The user responded positively but the OS in-app review was not
+  /// available on this device (e.g., emulator, no store installed).
+  reviewNotAvailable,
 }

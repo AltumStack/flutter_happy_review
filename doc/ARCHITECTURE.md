@@ -92,7 +92,7 @@ Each stage returns a specific `ReviewFlowResult` enum value on failure, preventi
 
 ### Debug Mode
 
-When enabled, bypasses snooze, prerequisites, platform policy, and conditions. Only trigger matching is evaluated. The `HappyReviewDebugPanel` widget visualizes internal state.
+When enabled, detailed logs are printed via `debugPrint` at every pipeline stage. All checks (snooze, prerequisites, platform policy, conditions) are still enforced. The `HappyReviewDebugPanel` widget visualizes internal state.
 
 ## Storage Keys
 

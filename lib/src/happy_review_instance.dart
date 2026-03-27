@@ -208,17 +208,15 @@ class HappyReview {
       _log('Trigger matched: ${matchingTrigger.eventName} '
           '(needs ${matchingTrigger.minOccurrences}, has $newCount).');
 
-      // 3. Check snooze cooldown (skipped in debug mode).
-      if (!_debugMode) {
-        final remindLaterDate =
-            await _storageAdapter.getDateTime('remind_later_date');
-        if (remindLaterDate != null) {
-          final snoozeUntil = remindLaterDate.add(_remindLaterCooldown);
-          if (DateTime.now().isBefore(snoozeUntil)) {
-            _log('Snoozed until ${snoozeUntil.toIso8601String()} '
-                '— skipping flow.');
-            return ReviewFlowResult.snoozed;
-          }
+      // 3. Check snooze cooldown.
+      final remindLaterDate =
+          await _storageAdapter.getDateTime('remind_later_date');
+      if (remindLaterDate != null) {
+        final snoozeUntil = remindLaterDate.add(_remindLaterCooldown);
+        if (DateTime.now().isBefore(snoozeUntil)) {
+          _log('Snoozed until ${snoozeUntil.toIso8601String()} '
+              '— skipping flow.');
+          return ReviewFlowResult.snoozed;
         }
       }
 
@@ -368,15 +366,27 @@ class HappyReview {
   ) async {
     // No dialog adapter → request review directly.
     if (_dialogAdapter == null) {
-      await _recordPromptShown(policyChecker);
-      await _resetTriggerCount(eventName);
-      await _requestReview();
-      _onReviewRequested?.call();
-      _log('OS review requested directly (no dialog adapter).');
-      return ReviewFlowResult.reviewRequestedDirect;
+      await _activateSnooze();
+      final reviewed = await _requestReview();
+      if (reviewed) {
+        await _clearSnooze();
+        await _recordPromptShown(policyChecker);
+        await _resetTriggerCount(eventName);
+        _onReviewRequested?.call();
+        _log('OS review requested directly (no dialog adapter).');
+        return ReviewFlowResult.reviewRequestedDirect;
+      } else {
+        // Nothing was shown to the user — don't count anything.
+        _log('OS review not available (no dialog adapter).');
+        return ReviewFlowResult.reviewNotAvailable;
+      }
     }
 
-    // Show pre-dialog.
+    // Activate snooze before showing the dialog as a safety net.
+    // If the app is killed while the dialog is visible, the snooze
+    // prevents immediate re-prompting on next launch.
+    await _activateSnooze();
+
     _onPreDialogShown?.call();
     _log('Showing pre-dialog.');
 
@@ -386,15 +396,24 @@ class HappyReview {
 
     switch (preResult) {
       case PreDialogResult.positive:
-        await _recordPromptShown(policyChecker);
-        await _resetTriggerCount(eventName);
         _onPreDialogPositive?.call();
-        await _requestReview();
-        _onReviewRequested?.call();
-        _log('User positive → OS review requested.');
-        return ReviewFlowResult.reviewRequested;
+        final reviewed = await _requestReview();
+        if (reviewed) {
+          await _clearSnooze();
+          await _recordPromptShown(policyChecker);
+          await _resetTriggerCount(eventName);
+          _onReviewRequested?.call();
+          _log('User positive → OS review requested.');
+          return ReviewFlowResult.reviewRequested;
+        } else {
+          await _clearSnooze();
+          await _recordPromptShown(policyChecker);
+          _log('User positive but OS review not available.');
+          return ReviewFlowResult.reviewNotAvailable;
+        }
 
       case PreDialogResult.negative:
+        await _clearSnooze();
         await _recordPromptShown(policyChecker);
         await _resetTriggerCount(eventName);
         _onPreDialogNegative?.call();
@@ -410,14 +429,14 @@ class HappyReview {
         return ReviewFlowResult.dialogDismissed;
 
       case PreDialogResult.remindLater:
-        await _activateSnooze();
+        // Snooze already active from safety net — just fire callback.
         _onPreDialogRemindLater?.call();
         _log('User chose remind later — snoozed for '
             '${_remindLaterCooldown.inHours}h.');
         return ReviewFlowResult.remindLater;
 
       case PreDialogResult.dismissed:
-        await _activateSnooze();
+        // Snooze already active from safety net — just fire callback.
         _onPreDialogDismissed?.call();
         _log('User dismissed pre-dialog — snoozed for '
             '${_remindLaterCooldown.inHours}h.');
@@ -434,18 +453,30 @@ class HappyReview {
     await _storageAdapter.setDateTime('remind_later_date', DateTime.now());
   }
 
+  Future<void> _clearSnooze() async {
+    // Set to epoch to effectively clear; the snooze check will see it as
+    // expired since epoch + any cooldown < now.
+    await _storageAdapter.setDateTime(
+      'remind_later_date',
+      DateTime.fromMillisecondsSinceEpoch(0),
+    );
+  }
+
   Future<void> _recordPromptShown(PlatformPolicyChecker policyChecker) async {
     await policyChecker.recordPrompt();
     await CooldownPeriod.recordPrompt(_storageAdapter);
     await MaxPromptsShown.incrementCount(_storageAdapter);
   }
 
-  Future<void> _requestReview() async {
+  /// Returns `true` if the OS review was available and requested.
+  Future<bool> _requestReview() async {
     if (await _inAppReview.isAvailable()) {
       _log('Requesting OS review.');
       await _inAppReview.requestReview();
+      return true;
     } else {
       _log('OS review not available on this device.');
+      return false;
     }
   }
 
