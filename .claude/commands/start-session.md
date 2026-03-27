@@ -1,6 +1,6 @@
 Review the current project status by reading the following files in order:
-1. docs/CURRENT_STATUS.md - What's in progress and what's blocked
-2. docs/decisions/_index.md - Recent decisions that might affect current work
+1. doc/CURRENT_STATUS.md - What's in progress and what's blocked
+2. doc/decisions/_index.md - Recent decisions that might affect current work
 
 Then check external state:
 3. Run `gh issue list --state open --limit 10` to see pending issues

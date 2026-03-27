@@ -1,5 +1,5 @@
 Provide a quick project status summary. Read:
-1. docs/CURRENT_STATUS.md
+1. doc/CURRENT_STATUS.md
 
 Summarize in 5 lines or less:
 - What's in progress

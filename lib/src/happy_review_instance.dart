@@ -55,6 +55,7 @@ class HappyReview {
   bool _enabled = true;
   bool _debugMode = false;
   bool _isFlowInProgress = false;
+  Duration _remindLaterCooldown = const Duration(days: 1);
   InAppReview _inAppReview = InAppReview.instance;
 
   /// Overrides the [InAppReview] instance used internally.
@@ -98,6 +99,9 @@ class HappyReview {
   ///   all review flows (e.g., via remote config). Defaults to `true`.
   /// - [debugMode]: When `true`, enables detailed logging via [debugPrint]
   ///   so you can observe the full pipeline during development.
+  /// - [remindLaterCooldown]: How long to wait before showing the review
+  ///   flow again after the user chose "remind me later" or dismissed the
+  ///   dialog. Defaults to one day.
   Future<void> configure({
     required List<HappyTrigger> triggers,
     List<HappyTrigger> prerequisites = const [],
@@ -107,6 +111,7 @@ class HappyReview {
     required ReviewStorageAdapter storageAdapter,
     bool enabled = true,
     bool debugMode = false,
+    Duration remindLaterCooldown = const Duration(days: 1),
     VoidCallback? onPreDialogShown,
     VoidCallback? onPreDialogPositive,
     VoidCallback? onPreDialogNegative,
@@ -123,6 +128,7 @@ class HappyReview {
     _storageAdapter = storageAdapter;
     _enabled = enabled;
     _debugMode = debugMode;
+    _remindLaterCooldown = remindLaterCooldown;
     _onPreDialogShown = onPreDialogShown;
     _onPreDialogPositive = onPreDialogPositive;
     _onPreDialogNegative = onPreDialogNegative;
@@ -202,7 +208,19 @@ class HappyReview {
       _log('Trigger matched: ${matchingTrigger.eventName} '
           '(needs ${matchingTrigger.minOccurrences}, has $newCount).');
 
-      // 3. Check prerequisites (AND — all must be met).
+      // 3. Check snooze cooldown.
+      final remindLaterDate =
+          await _storageAdapter.getDateTime('remind_later_date');
+      if (remindLaterDate != null) {
+        final snoozeUntil = remindLaterDate.add(_remindLaterCooldown);
+        if (DateTime.now().isBefore(snoozeUntil)) {
+          _log('Snoozed until ${snoozeUntil.toIso8601String()} '
+              '— skipping flow.');
+          return ReviewFlowResult.snoozed;
+        }
+      }
+
+      // 4. Check prerequisites (AND — all must be met).
       for (final prereq in _prerequisites) {
         final prereqCount =
             await _storageAdapter.getInt('event_count_${prereq.eventName}');
@@ -213,7 +231,7 @@ class HappyReview {
         }
       }
 
-      // 4. Check platform policy.
+      // 5. Check platform policy.
       final policyChecker = PlatformPolicyChecker(
         rules: _platformPolicy.current,
         storage: _storageAdapter,
@@ -223,7 +241,7 @@ class HappyReview {
         return ReviewFlowResult.blockedByPlatformPolicy;
       }
 
-      // 5. Check custom conditions.
+      // 6. Check custom conditions.
       for (final condition in _conditions) {
         if (!await condition.evaluate(_storageAdapter)) {
           _log('Condition not met: ${condition.runtimeType}.');
@@ -231,11 +249,11 @@ class HappyReview {
         }
       }
 
-      // 6. Run the review flow.
+      // 7. Run the review flow.
       if (!context.mounted) return ReviewFlowResult.dialogDismissed;
       // Use `await` so the finally block runs after the flow completes,
       // not immediately after _executeFlow is called.
-      return await _executeFlow(context, policyChecker);
+      return await _executeFlow(context, policyChecker, eventName);
     } finally {
       _isFlowInProgress = false;
     }
@@ -313,6 +331,15 @@ class HappyReview {
       conditionStatuses.add(ConditionStatus(name: name, isMet: met));
     }
 
+    final remindLaterDate =
+        await _storageAdapter.getDateTime('remind_later_date');
+    DateTime? snoozeUntil;
+    bool isSnoozed = false;
+    if (remindLaterDate != null) {
+      snoozeUntil = remindLaterDate.add(_remindLaterCooldown);
+      isSnoozed = DateTime.now().isBefore(snoozeUntil);
+    }
+
     return DebugSnapshot(
       enabled: _enabled,
       debugMode: _debugMode,
@@ -325,6 +352,8 @@ class HappyReview {
       promptsShown: await _storageAdapter.getInt('prompts_shown_count'),
       lastPromptDate: await _storageAdapter.getDateTime('last_prompt_date'),
       installDate: await _storageAdapter.getDateTime('install_date'),
+      isSnoozed: isSnoozed,
+      snoozeUntil: isSnoozed ? snoozeUntil : null,
     );
   }
 
@@ -333,35 +362,61 @@ class HappyReview {
   Future<ReviewFlowResult> _executeFlow(
     BuildContext context,
     PlatformPolicyChecker policyChecker,
+    String eventName,
   ) async {
     // No dialog adapter → request review directly.
     if (_dialogAdapter == null) {
-      await _recordPromptShown(policyChecker);
-      await _requestReview();
-      _onReviewRequested?.call();
-      _log('OS review requested directly (no dialog adapter).');
-      return ReviewFlowResult.reviewRequestedDirect;
+      await _activateSnooze();
+      final reviewed = await _requestReview();
+      if (reviewed) {
+        await _clearSnooze();
+        await _recordPromptShown(policyChecker);
+        await _resetTriggerCount(eventName);
+        _onReviewRequested?.call();
+        _log('OS review requested directly (no dialog adapter).');
+        return ReviewFlowResult.reviewRequestedDirect;
+      } else {
+        await _clearSnooze();
+        // Nothing was shown to the user — don't count anything.
+        _log('OS review not available (no dialog adapter).');
+        return ReviewFlowResult.reviewNotAvailable;
+      }
     }
 
-    // Show pre-dialog.
-    _onPreDialogShown?.call();
-    _log('Showing pre-dialog.');
+    // Activate snooze before showing the dialog as a safety net.
+    // If the app is killed while the dialog is visible, the snooze
+    // prevents immediate re-prompting on next launch.
+    await _activateSnooze();
 
     if (!context.mounted) return ReviewFlowResult.dialogDismissed;
+
+    _onPreDialogShown?.call();
+    _log('Showing pre-dialog.');
 
     final preResult = await _dialogAdapter!.showPreDialog(context);
 
     switch (preResult) {
       case PreDialogResult.positive:
-        await _recordPromptShown(policyChecker);
         _onPreDialogPositive?.call();
-        await _requestReview();
-        _onReviewRequested?.call();
-        _log('User positive → OS review requested.');
-        return ReviewFlowResult.reviewRequested;
+        final reviewed = await _requestReview();
+        if (reviewed) {
+          await _clearSnooze();
+          await _recordPromptShown(policyChecker);
+          await _resetTriggerCount(eventName);
+          _onReviewRequested?.call();
+          _log('User positive → OS review requested.');
+          return ReviewFlowResult.reviewRequested;
+        } else {
+          await _clearSnooze();
+          await _recordPromptShown(policyChecker);
+          _log('User positive but OS review not available.');
+          return ReviewFlowResult.reviewNotAvailable;
+        }
 
       case PreDialogResult.negative:
+        await _clearSnooze();
         await _recordPromptShown(policyChecker);
+        await _resetTriggerCount(eventName);
         _onPreDialogNegative?.call();
         _log('User negative → showing feedback dialog.');
         if (!context.mounted) return ReviewFlowResult.dialogDismissed;
@@ -375,15 +430,37 @@ class HappyReview {
         return ReviewFlowResult.dialogDismissed;
 
       case PreDialogResult.remindLater:
+        // Snooze already active from safety net — just fire callback.
         _onPreDialogRemindLater?.call();
-        _log('User chose remind later.');
+        _log('User chose remind later — snoozed for '
+            '${_remindLaterCooldown.inHours}h.');
         return ReviewFlowResult.remindLater;
 
       case PreDialogResult.dismissed:
+        // Snooze already active from safety net — just fire callback.
         _onPreDialogDismissed?.call();
-        _log('User dismissed pre-dialog.');
+        _log('User dismissed pre-dialog — snoozed for '
+            '${_remindLaterCooldown.inHours}h.');
         return ReviewFlowResult.dialogDismissed;
     }
+  }
+
+  Future<void> _resetTriggerCount(String eventName) async {
+    await _storageAdapter.setInt('event_count_$eventName', 0);
+    _log('Trigger counter reset for "$eventName".');
+  }
+
+  Future<void> _activateSnooze() async {
+    await _storageAdapter.setDateTime('remind_later_date', DateTime.now());
+  }
+
+  Future<void> _clearSnooze() async {
+    // Set to epoch to effectively clear; the snooze check will see it as
+    // expired since epoch + any cooldown < now.
+    await _storageAdapter.setDateTime(
+      'remind_later_date',
+      DateTime.fromMillisecondsSinceEpoch(0),
+    );
   }
 
   Future<void> _recordPromptShown(PlatformPolicyChecker policyChecker) async {
@@ -392,12 +469,15 @@ class HappyReview {
     await MaxPromptsShown.incrementCount(_storageAdapter);
   }
 
-  Future<void> _requestReview() async {
+  /// Returns `true` if the OS review was available and requested.
+  Future<bool> _requestReview() async {
     if (await _inAppReview.isAvailable()) {
       _log('Requesting OS review.');
       await _inAppReview.requestReview();
+      return true;
     } else {
       _log('OS review not available on this device.');
+      return false;
     }
   }
 

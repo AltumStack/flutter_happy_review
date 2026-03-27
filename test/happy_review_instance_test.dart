@@ -58,6 +58,7 @@ void main() {
     bool enabled = true,
     bool debugMode = true,
     PlatformPolicy platformPolicy = relaxedPolicy,
+    Duration remindLaterCooldown = const Duration(days: 1),
     VoidCallback? onPreDialogShown,
     VoidCallback? onPreDialogPositive,
     VoidCallback? onPreDialogNegative,
@@ -75,6 +76,7 @@ void main() {
       enabled: enabled,
       debugMode: debugMode,
       platformPolicy: platformPolicy,
+      remindLaterCooldown: remindLaterCooldown,
       onPreDialogShown: onPreDialogShown,
       onPreDialogPositive: onPreDialogPositive,
       onPreDialogNegative: onPreDialogNegative,
@@ -1307,6 +1309,7 @@ void main() {
                 eventName: 'purchase', minOccurrences: 1),
           ],
           dialog: dialogAdapter,
+          remindLaterCooldown: Duration.zero,
         );
 
         await tester.pumpWidget(const MaterialApp(home: Scaffold()));
@@ -1435,6 +1438,731 @@ void main() {
         // Clean up.
         completer.complete(PreDialogResult.dismissed);
         await firstFuture;
+      },
+    );
+  });
+
+  group('Snooze mechanism', () {
+    testWidgets(
+      'Given the user chose remind later, '
+      'When logEvent is called again within the cooldown, '
+      'Then returns snoozed',
+      (tester) async {
+        when(() => dialogAdapter.showPreDialog(any()))
+            .thenAnswer((_) async => PreDialogResult.remindLater);
+
+        await configureWith(
+          triggers: [
+            const HappyTrigger(eventName: 'purchase', minOccurrences: 1),
+          ],
+          dialog: dialogAdapter,
+          debugMode: false,
+          remindLaterCooldown: const Duration(hours: 12),
+        );
+
+        await tester.pumpWidget(const MaterialApp(home: Scaffold()));
+        final context = tester.element(find.byType(Scaffold));
+
+        // First call — dialog shown, user chooses remind later.
+        final first =
+            await HappyReview.instance.logEvent(context, 'purchase');
+        expect(first, equals(ReviewFlowResult.remindLater));
+
+        // Second call — within cooldown, should be snoozed.
+        final second =
+            await HappyReview.instance.logEvent(context, 'purchase');
+        expect(second, equals(ReviewFlowResult.snoozed));
+      },
+    );
+
+    testWidgets(
+      'Given the user dismissed the dialog, '
+      'When logEvent is called again within the cooldown, '
+      'Then returns snoozed',
+      (tester) async {
+        when(() => dialogAdapter.showPreDialog(any()))
+            .thenAnswer((_) async => PreDialogResult.dismissed);
+
+        await configureWith(
+          triggers: [
+            const HappyTrigger(eventName: 'purchase', minOccurrences: 1),
+          ],
+          dialog: dialogAdapter,
+          debugMode: false,
+          remindLaterCooldown: const Duration(hours: 12),
+        );
+
+        await tester.pumpWidget(const MaterialApp(home: Scaffold()));
+        final context = tester.element(find.byType(Scaffold));
+
+        // First call — dialog shown, user dismisses.
+        final first =
+            await HappyReview.instance.logEvent(context, 'purchase');
+        expect(first, equals(ReviewFlowResult.dialogDismissed));
+
+        // Second call — within cooldown, should be snoozed.
+        final second =
+            await HappyReview.instance.logEvent(context, 'purchase');
+        expect(second, equals(ReviewFlowResult.snoozed));
+      },
+    );
+
+    testWidgets(
+      'Given the snooze cooldown has expired, '
+      'When logEvent is called, '
+      'Then the dialog is shown again',
+      (tester) async {
+        when(() => dialogAdapter.showPreDialog(any()))
+            .thenAnswer((_) async => PreDialogResult.positive);
+
+        await configureWith(
+          triggers: [
+            const HappyTrigger(eventName: 'purchase', minOccurrences: 1),
+          ],
+          dialog: dialogAdapter,
+          debugMode: false,
+          remindLaterCooldown: const Duration(hours: 1),
+        );
+
+        // Simulate an expired snooze (remind_later_date was 2 hours ago).
+        await storage.setDateTime(
+          'remind_later_date',
+          DateTime.now().subtract(const Duration(hours: 2)),
+        );
+
+        await tester.pumpWidget(const MaterialApp(home: Scaffold()));
+        final context = tester.element(find.byType(Scaffold));
+
+        final result =
+            await HappyReview.instance.logEvent(context, 'purchase');
+        expect(result, equals(ReviewFlowResult.reviewRequested));
+      },
+    );
+
+    testWidgets(
+      'Given the snooze is active and debug mode is on, '
+      'When logEvent is called, '
+      'Then snooze is still enforced (debug mode only enables logging)',
+      (tester) async {
+        await configureWith(
+          triggers: [
+            const HappyTrigger(eventName: 'purchase', minOccurrences: 1),
+          ],
+          dialog: dialogAdapter,
+          debugMode: true,
+          remindLaterCooldown: const Duration(hours: 12),
+        );
+
+        // Simulate an active snooze.
+        await storage.setDateTime('remind_later_date', DateTime.now());
+
+        await tester.pumpWidget(const MaterialApp(home: Scaffold()));
+        final context = tester.element(find.byType(Scaffold));
+
+        final result =
+            await HappyReview.instance.logEvent(context, 'purchase');
+        expect(result, equals(ReviewFlowResult.snoozed));
+      },
+    );
+
+    testWidgets(
+      'Given a custom remindLaterCooldown of 3 days, '
+      'When the snooze was set 2 days ago, '
+      'Then the flow is still snoozed',
+      (tester) async {
+        await configureWith(
+          triggers: [
+            const HappyTrigger(eventName: 'purchase', minOccurrences: 1),
+          ],
+          dialog: dialogAdapter,
+          debugMode: false,
+          remindLaterCooldown: const Duration(days: 3),
+        );
+
+        // Snooze set 2 days ago — still within 3-day cooldown.
+        await storage.setDateTime(
+          'remind_later_date',
+          DateTime.now().subtract(const Duration(days: 2)),
+        );
+
+        await tester.pumpWidget(const MaterialApp(home: Scaffold()));
+        final context = tester.element(find.byType(Scaffold));
+
+        final result =
+            await HappyReview.instance.logEvent(context, 'purchase');
+        expect(result, equals(ReviewFlowResult.snoozed));
+      },
+    );
+
+    testWidgets(
+      'Given a snooze is active, '
+      'When reset() is called and a new event fires, '
+      'Then the dialog is shown (snooze cleared)',
+      (tester) async {
+        when(() => dialogAdapter.showPreDialog(any()))
+            .thenAnswer((_) async => PreDialogResult.positive);
+
+        await configureWith(
+          triggers: [
+            const HappyTrigger(eventName: 'purchase', minOccurrences: 1),
+          ],
+          dialog: dialogAdapter,
+          debugMode: false,
+          remindLaterCooldown: const Duration(hours: 12),
+        );
+
+        // Simulate an active snooze.
+        await storage.setDateTime('remind_later_date', DateTime.now());
+
+        // Reset clears all storage.
+        await HappyReview.instance.reset();
+
+        await tester.pumpWidget(const MaterialApp(home: Scaffold()));
+        final context = tester.element(find.byType(Scaffold));
+
+        final result =
+            await HappyReview.instance.logEvent(context, 'purchase');
+        expect(result, equals(ReviewFlowResult.reviewRequested));
+      },
+    );
+
+    testWidgets(
+      'Given a snooze is active, '
+      'When getDebugSnapshot is called, '
+      'Then snapshot shows snooze state',
+      (tester) async {
+        await configureWith(
+          triggers: [
+            const HappyTrigger(eventName: 'purchase', minOccurrences: 1),
+          ],
+          remindLaterCooldown: const Duration(hours: 6),
+        );
+
+        await storage.setDateTime('remind_later_date', DateTime.now());
+
+        final snapshot = await HappyReview.instance.getDebugSnapshot();
+        expect(snapshot.isSnoozed, isTrue);
+        expect(snapshot.snoozeUntil, isNotNull);
+      },
+    );
+
+    testWidgets(
+      'Given no snooze is active, '
+      'When getDebugSnapshot is called, '
+      'Then snapshot shows not snoozed',
+      (tester) async {
+        await configureWith(
+          triggers: [
+            const HappyTrigger(eventName: 'purchase', minOccurrences: 1),
+          ],
+        );
+
+        final snapshot = await HappyReview.instance.getDebugSnapshot();
+        expect(snapshot.isSnoozed, isFalse);
+        expect(snapshot.snoozeUntil, isNull);
+      },
+    );
+  });
+
+  group('Trigger counter reset on engagement', () {
+    testWidgets(
+      'Given user responds positively, '
+      'When the flow completes, '
+      'Then the trigger event counter resets to zero',
+      (tester) async {
+        when(() => dialogAdapter.showPreDialog(any()))
+            .thenAnswer((_) async => PreDialogResult.positive);
+
+        await configureWith(
+          triggers: [
+            const HappyTrigger(eventName: 'purchase', minOccurrences: 2),
+          ],
+          dialog: dialogAdapter,
+        );
+
+        await tester.pumpWidget(const MaterialApp(home: Scaffold()));
+        final context = tester.element(find.byType(Scaffold));
+
+        // Log 2 events to trigger the flow.
+        await HappyReview.instance.logEvent(context, 'purchase');
+        final result =
+            await HappyReview.instance.logEvent(context, 'purchase');
+        expect(result, equals(ReviewFlowResult.reviewRequested));
+
+        // Counter should be reset to 0.
+        final count =
+            await HappyReview.instance.getEventCount('purchase');
+        expect(count, equals(0));
+      },
+    );
+
+    testWidgets(
+      'Given user responds negatively and submits feedback, '
+      'When the flow completes, '
+      'Then the trigger event counter resets to zero',
+      (tester) async {
+        when(() => dialogAdapter.showPreDialog(any()))
+            .thenAnswer((_) async => PreDialogResult.negative);
+        when(() => dialogAdapter.showFeedbackDialog(any()))
+            .thenAnswer((_) async => const FeedbackResult(comment: 'Too slow'));
+
+        await configureWith(
+          triggers: [
+            const HappyTrigger(eventName: 'purchase', minOccurrences: 2),
+          ],
+          dialog: dialogAdapter,
+        );
+
+        await tester.pumpWidget(const MaterialApp(home: Scaffold()));
+        final context = tester.element(find.byType(Scaffold));
+
+        await HappyReview.instance.logEvent(context, 'purchase');
+        final result =
+            await HappyReview.instance.logEvent(context, 'purchase');
+        expect(result, equals(ReviewFlowResult.feedbackSubmitted));
+
+        final count =
+            await HappyReview.instance.getEventCount('purchase');
+        expect(count, equals(0));
+      },
+    );
+
+    testWidgets(
+      'Given the counter was reset after engagement, '
+      'When new events are logged, '
+      'Then the trigger requires minOccurrences again to fire',
+      (tester) async {
+        int callCount = 0;
+        when(() => dialogAdapter.showPreDialog(any())).thenAnswer((_) async {
+          callCount++;
+          return PreDialogResult.positive;
+        });
+
+        await configureWith(
+          triggers: [
+            const HappyTrigger(eventName: 'purchase', minOccurrences: 3),
+          ],
+          dialog: dialogAdapter,
+        );
+
+        await tester.pumpWidget(const MaterialApp(home: Scaffold()));
+        final context = tester.element(find.byType(Scaffold));
+
+        // First cycle: 3 events → dialog shown.
+        await HappyReview.instance.logEvent(context, 'purchase');
+        await HappyReview.instance.logEvent(context, 'purchase');
+        await HappyReview.instance.logEvent(context, 'purchase');
+        expect(callCount, equals(1));
+
+        // After reset, 1-2 events should NOT trigger again.
+        final r1 =
+            await HappyReview.instance.logEvent(context, 'purchase');
+        expect(r1, equals(ReviewFlowResult.noTrigger));
+
+        final r2 =
+            await HappyReview.instance.logEvent(context, 'purchase');
+        expect(r2, equals(ReviewFlowResult.noTrigger));
+
+        // Third event in new cycle → triggers again.
+        final r3 =
+            await HappyReview.instance.logEvent(context, 'purchase');
+        expect(r3, equals(ReviewFlowResult.reviewRequested));
+        expect(callCount, equals(2));
+      },
+    );
+
+    testWidgets(
+      'Given user chose remind later, '
+      'When the flow completes, '
+      'Then the trigger event counter is NOT reset',
+      (tester) async {
+        when(() => dialogAdapter.showPreDialog(any()))
+            .thenAnswer((_) async => PreDialogResult.remindLater);
+
+        await configureWith(
+          triggers: [
+            const HappyTrigger(eventName: 'purchase', minOccurrences: 2),
+          ],
+          dialog: dialogAdapter,
+        );
+
+        await tester.pumpWidget(const MaterialApp(home: Scaffold()));
+        final context = tester.element(find.byType(Scaffold));
+
+        await HappyReview.instance.logEvent(context, 'purchase');
+        await HappyReview.instance.logEvent(context, 'purchase');
+
+        // Counter should NOT be reset — user didn't engage.
+        final count =
+            await HappyReview.instance.getEventCount('purchase');
+        expect(count, equals(2));
+      },
+    );
+
+    testWidgets(
+      'Given user dismissed the dialog, '
+      'When the flow completes, '
+      'Then the trigger event counter is NOT reset',
+      (tester) async {
+        when(() => dialogAdapter.showPreDialog(any()))
+            .thenAnswer((_) async => PreDialogResult.dismissed);
+
+        await configureWith(
+          triggers: [
+            const HappyTrigger(eventName: 'purchase', minOccurrences: 2),
+          ],
+          dialog: dialogAdapter,
+        );
+
+        await tester.pumpWidget(const MaterialApp(home: Scaffold()));
+        final context = tester.element(find.byType(Scaffold));
+
+        await HappyReview.instance.logEvent(context, 'purchase');
+        await HappyReview.instance.logEvent(context, 'purchase');
+
+        // Counter should NOT be reset — user didn't engage.
+        final count =
+            await HappyReview.instance.getEventCount('purchase');
+        expect(count, equals(2));
+      },
+    );
+
+    testWidgets(
+      'Given no dialog adapter is configured (direct review), '
+      'When the flow completes, '
+      'Then the trigger event counter resets to zero',
+      (tester) async {
+        await configureWith(
+          triggers: [
+            const HappyTrigger(eventName: 'purchase', minOccurrences: 2),
+          ],
+          // No dialog adapter → direct OS review.
+        );
+
+        await tester.pumpWidget(const MaterialApp(home: Scaffold()));
+        final context = tester.element(find.byType(Scaffold));
+
+        await HappyReview.instance.logEvent(context, 'purchase');
+        final result =
+            await HappyReview.instance.logEvent(context, 'purchase');
+        expect(result, equals(ReviewFlowResult.reviewRequestedDirect));
+
+        final count =
+            await HappyReview.instance.getEventCount('purchase');
+        expect(count, equals(0));
+      },
+    );
+
+    testWidgets(
+      'Given multiple triggers for different events, '
+      'When one trigger fires and user engages, '
+      'Then only that trigger counter resets',
+      (tester) async {
+        when(() => dialogAdapter.showPreDialog(any()))
+            .thenAnswer((_) async => PreDialogResult.positive);
+
+        await configureWith(
+          triggers: [
+            const HappyTrigger(eventName: 'purchase', minOccurrences: 2),
+            const HappyTrigger(eventName: 'workout', minOccurrences: 5),
+          ],
+          dialog: dialogAdapter,
+        );
+
+        await tester.pumpWidget(const MaterialApp(home: Scaffold()));
+        final context = tester.element(find.byType(Scaffold));
+
+        // Log events for both triggers.
+        await HappyReview.instance.logEvent(context, 'workout');
+        await HappyReview.instance.logEvent(context, 'workout');
+        await HappyReview.instance.logEvent(context, 'purchase');
+        await HappyReview.instance.logEvent(context, 'purchase');
+
+        // Purchase counter should be reset, workout should not.
+        final purchaseCount =
+            await HappyReview.instance.getEventCount('purchase');
+        final workoutCount =
+            await HappyReview.instance.getEventCount('workout');
+        expect(purchaseCount, equals(0));
+        expect(workoutCount, equals(2));
+      },
+    );
+  });
+
+  group('Review not available', () {
+    testWidgets(
+      'Given user responds positively but OS review is not available, '
+      'When the flow completes, '
+      'Then returns reviewNotAvailable, prompt recorded, counter NOT reset',
+      (tester) async {
+        when(() => dialogAdapter.showPreDialog(any()))
+            .thenAnswer((_) async => PreDialogResult.positive);
+        when(() => mockInAppReview.isAvailable())
+            .thenAnswer((_) async => false);
+
+        await configureWith(
+          triggers: [
+            const HappyTrigger(eventName: 'purchase', minOccurrences: 2),
+          ],
+          dialog: dialogAdapter,
+          debugMode: false,
+          remindLaterCooldown: Duration.zero,
+        );
+
+        await tester.pumpWidget(const MaterialApp(home: Scaffold()));
+        final context = tester.element(find.byType(Scaffold));
+
+        await HappyReview.instance.logEvent(context, 'purchase');
+        final result =
+            await HappyReview.instance.logEvent(context, 'purchase');
+        expect(result, equals(ReviewFlowResult.reviewNotAvailable));
+
+        // Prompt was recorded (pre-dialog was shown).
+        final prompts =
+            await HappyReview.instance.getPromptsShownCount();
+        expect(prompts, equals(1));
+
+        // Counter was NOT reset (user couldn't complete the review).
+        final count =
+            await HappyReview.instance.getEventCount('purchase');
+        expect(count, equals(2));
+      },
+    );
+
+    testWidgets(
+      'Given no dialog adapter and OS review is not available, '
+      'When logEvent triggers the flow, '
+      'Then returns reviewNotAvailable, prompt NOT recorded, counter NOT reset',
+      (tester) async {
+        when(() => mockInAppReview.isAvailable())
+            .thenAnswer((_) async => false);
+
+        await configureWith(
+          triggers: [
+            const HappyTrigger(eventName: 'purchase', minOccurrences: 2),
+          ],
+          // No dialog adapter.
+          debugMode: false,
+          remindLaterCooldown: Duration.zero,
+        );
+
+        await tester.pumpWidget(const MaterialApp(home: Scaffold()));
+        final context = tester.element(find.byType(Scaffold));
+
+        await HappyReview.instance.logEvent(context, 'purchase');
+        final result =
+            await HappyReview.instance.logEvent(context, 'purchase');
+        expect(result, equals(ReviewFlowResult.reviewNotAvailable));
+
+        // Prompt was NOT recorded (nothing was shown).
+        final prompts =
+            await HappyReview.instance.getPromptsShownCount();
+        expect(prompts, equals(0));
+
+        // Counter was NOT reset.
+        final count =
+            await HappyReview.instance.getEventCount('purchase');
+        expect(count, equals(2));
+      },
+    );
+
+    testWidgets(
+      'Given OS review is not available, '
+      'When the flow completes, '
+      'Then onReviewRequested callback is NOT called',
+      (tester) async {
+        bool callbackCalled = false;
+        when(() => dialogAdapter.showPreDialog(any()))
+            .thenAnswer((_) async => PreDialogResult.positive);
+        when(() => mockInAppReview.isAvailable())
+            .thenAnswer((_) async => false);
+
+        await configureWith(
+          triggers: [
+            const HappyTrigger(eventName: 'purchase', minOccurrences: 1),
+          ],
+          dialog: dialogAdapter,
+          debugMode: false,
+          remindLaterCooldown: Duration.zero,
+          onReviewRequested: () => callbackCalled = true,
+        );
+
+        await tester.pumpWidget(const MaterialApp(home: Scaffold()));
+        final context = tester.element(find.byType(Scaffold));
+
+        await HappyReview.instance.logEvent(context, 'purchase');
+        expect(callbackCalled, isFalse);
+      },
+    );
+
+    testWidgets(
+      'Given no dialog adapter, OS review not available, non-zero cooldown, '
+      'When logEvent is called again, '
+      'Then flow is NOT blocked by stale snooze',
+      (tester) async {
+        // First call: not available.
+        when(() => mockInAppReview.isAvailable())
+            .thenAnswer((_) async => false);
+
+        await configureWith(
+          triggers: [
+            const HappyTrigger(eventName: 'purchase', minOccurrences: 1),
+          ],
+          // No dialog adapter.
+          debugMode: false,
+          remindLaterCooldown: const Duration(hours: 12),
+        );
+
+        await tester.pumpWidget(const MaterialApp(home: Scaffold()));
+        final context = tester.element(find.byType(Scaffold));
+
+        final first =
+            await HappyReview.instance.logEvent(context, 'purchase');
+        expect(first, equals(ReviewFlowResult.reviewNotAvailable));
+
+        // Second call: now available — should NOT be blocked by snooze.
+        when(() => mockInAppReview.isAvailable())
+            .thenAnswer((_) async => true);
+
+        final second =
+            await HappyReview.instance.logEvent(context, 'purchase');
+        expect(second, equals(ReviewFlowResult.reviewRequestedDirect));
+      },
+    );
+
+    testWidgets(
+      'Given user was positive but OS review not available, '
+      'When logEvent is called again after cooldown, '
+      'Then the flow re-triggers without needing more events',
+      (tester) async {
+        when(() => dialogAdapter.showPreDialog(any()))
+            .thenAnswer((_) async => PreDialogResult.positive);
+
+        // First call: not available.
+        when(() => mockInAppReview.isAvailable())
+            .thenAnswer((_) async => false);
+
+        await configureWith(
+          triggers: [
+            const HappyTrigger(eventName: 'purchase', minOccurrences: 2),
+          ],
+          dialog: dialogAdapter,
+          debugMode: false,
+          remindLaterCooldown: Duration.zero,
+        );
+
+        await tester.pumpWidget(const MaterialApp(home: Scaffold()));
+        final context = tester.element(find.byType(Scaffold));
+
+        await HappyReview.instance.logEvent(context, 'purchase');
+        final first =
+            await HappyReview.instance.logEvent(context, 'purchase');
+        expect(first, equals(ReviewFlowResult.reviewNotAvailable));
+
+        // Counter was preserved (2), so next event triggers again.
+        when(() => mockInAppReview.isAvailable())
+            .thenAnswer((_) async => true);
+
+        final second =
+            await HappyReview.instance.logEvent(context, 'purchase');
+        expect(second, equals(ReviewFlowResult.reviewRequested));
+      },
+    );
+  });
+
+  group('App kill safety net', () {
+    testWidgets(
+      'Given the pre-dialog is about to be shown, '
+      'When we check storage, '
+      'Then snooze is persisted before the dialog result',
+      (tester) async {
+        when(() => dialogAdapter.showPreDialog(any()))
+            .thenAnswer((_) async => PreDialogResult.remindLater);
+
+        await configureWith(
+          triggers: [
+            const HappyTrigger(eventName: 'purchase', minOccurrences: 1),
+          ],
+          dialog: dialogAdapter,
+          debugMode: false,
+          remindLaterCooldown: const Duration(hours: 1),
+        );
+
+        await tester.pumpWidget(const MaterialApp(home: Scaffold()));
+        final context = tester.element(find.byType(Scaffold));
+
+        await HappyReview.instance.logEvent(context, 'purchase');
+
+        // Snooze should be active (set before dialog, stays for remindLater).
+        final remindDate =
+            await storage.getDateTime('remind_later_date');
+        expect(remindDate, isNotNull);
+      },
+    );
+
+    testWidgets(
+      'Given user responds positively, '
+      'When the flow completes, '
+      'Then snooze is cleared',
+      (tester) async {
+        when(() => dialogAdapter.showPreDialog(any()))
+            .thenAnswer((_) async => PreDialogResult.positive);
+
+        await configureWith(
+          triggers: [
+            const HappyTrigger(eventName: 'purchase', minOccurrences: 1),
+          ],
+          dialog: dialogAdapter,
+          debugMode: false,
+          remindLaterCooldown: const Duration(hours: 12),
+        );
+
+        await tester.pumpWidget(const MaterialApp(home: Scaffold()));
+        final context = tester.element(find.byType(Scaffold));
+
+        await HappyReview.instance.logEvent(context, 'purchase');
+
+        // Snooze should be cleared (set to epoch).
+        final remindDate =
+            await storage.getDateTime('remind_later_date');
+        expect(
+          remindDate!.millisecondsSinceEpoch,
+          equals(0),
+        );
+      },
+    );
+
+    testWidgets(
+      'Given user responds negatively, '
+      'When the flow completes, '
+      'Then snooze is cleared',
+      (tester) async {
+        when(() => dialogAdapter.showPreDialog(any()))
+            .thenAnswer((_) async => PreDialogResult.negative);
+        when(() => dialogAdapter.showFeedbackDialog(any()))
+            .thenAnswer((_) async => null);
+
+        await configureWith(
+          triggers: [
+            const HappyTrigger(eventName: 'purchase', minOccurrences: 1),
+          ],
+          dialog: dialogAdapter,
+          debugMode: false,
+          remindLaterCooldown: const Duration(hours: 12),
+        );
+
+        await tester.pumpWidget(const MaterialApp(home: Scaffold()));
+        final context = tester.element(find.byType(Scaffold));
+
+        await HappyReview.instance.logEvent(context, 'purchase');
+
+        // Snooze should be cleared (set to epoch).
+        final remindDate =
+            await storage.getDateTime('remind_later_date');
+        expect(
+          remindDate!.millisecondsSinceEpoch,
+          equals(0),
+        );
       },
     );
   });
